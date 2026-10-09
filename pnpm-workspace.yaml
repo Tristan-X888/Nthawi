@@ -2,7 +2,31 @@ packages:
   - "apps/*"
   - "packages/*"
 
-allowBuilds:
-  sharp: true
-  unrs-resolver: true
-  msw: false
+# Keep installs and pnpm-run scripts on the same project runtime.
+useNodeVersion: 24.21.0
+engineStrict: true
+packageManagerStrictVersion: true
+strictPeerDependencies: true
+saveExact: true
+
+# Compatible security fixes for the current dependency graph.
+# Revalidate these scoped pins when updating their parent dependencies.
+overrides:
+  "next@16.3.8>sharp": "0.35.5"
+  "source-map-js@>=1.0.0 <1.2.2": "1.2.2"
+  "next@16.3.8>baseline-browser-mapping": "2.11.27"
+
+# Reuse cached downloads and tolerate temporary connection interruptions.
+preferOffline: true
+networkConcurrency: 4
+fetchRetries: 3
+fetchRetryMintimeout: 10000
+fetchRetryMaxtimeout: 60000
+fetchTimeout: 120000
+
+# Build-script settings supported by the pinned pnpm 10.16.1.
+onlyBuiltDependencies:
+  - sharp
+  - unrs-resolver
+ignoredBuiltDependencies:
+  - msw

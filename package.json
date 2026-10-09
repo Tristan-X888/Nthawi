@@ -1,24 +1,42 @@
 {
-  "name": "Nthawi",
-  "version": "0.0.1",
+  "name": "nthawi",
   "private": true,
+  "packageManager": "pnpm@10.16.1",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": "10.16.1"
+  },
   "scripts": {
-    "build": "turbo build",
     "dev": "turbo dev",
+    "build": "turbo build",
     "lint": "turbo lint",
-    "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:cov": "turbo test:cov",
+    "test:integration": "turbo test:integration",
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "test:boundaries": "node --test scripts/check-browser-boundaries.test.mjs",
+    "check:boundaries": "node scripts/check-browser-boundaries.mjs",
+    "check:runtime": "turbo run build --filter=@nthawi/api && pnpm --filter @nthawi/api test:runtime",
+    "check:api-image": "node scripts/check-api-image.mjs",
+    "test:api-image": "node --test scripts/check-api-image.test.mjs",
+    "check:step3": "pnpm check && pnpm test:boundaries && pnpm test:api-image && pnpm check:boundaries && pnpm check:runtime",
+    "db:up": "docker compose --env-file .env -f infra/compose.dev.yml up -d --wait --wait-timeout 60",
+    "db:down": "docker compose -f infra/compose.dev.yml down",
+    "db:logs": "docker compose -f infra/compose.dev.yml logs -f postgres"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
-    "prettier": "^3.8.3",
-    "prettier-plugin-tailwindcss": "^0.8.0",
-    "turbo": "^2.9.18",
-    "typescript": "^5"
-  },
-  "packageManager": "pnpm@10.33.4",
-  "engines": {
-    "node": ">=20"
+    "eslint": "10.11.0",
+    "prettier": "3.8.3",
+    "prettier-plugin-tailwindcss": "0.8.0",
+    "turbo": "2.11.4",
+    "typescript": "6.0.3"
   }
 }

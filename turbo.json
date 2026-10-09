@@ -1,24 +1,70 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "ui": "tui",
   "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "dist/**", "!.next/cache/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
     },
-    "format": {
-      "dependsOn": ["^format"]
+    "@nthawi/api#lint": {
+      "dependsOn": ["^build", "^lint"]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^build", "^typecheck"]
     },
-    "dev": {
+    "test": {
+      "dependsOn": ["^build", "^test"],
+      "outputs": []
+    },
+    "test:cov": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:integration": {
       "cache": false,
-      "persistent": true
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["RLS_TEST_ADMIN_URL", "AUTH_TEST_ADMIN_URL"]
+    },
+    "@nthawi/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_API_URL"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"]
+    },
+    "@nthawi/api#dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "NODE_ENV",
+        "WEB_ORIGIN",
+        "AUTH_TRUSTED_ORIGINS",
+        "WIDGET_ORIGIN",
+        "API_PORT",
+        "API_TRUST_PROXY",
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "BETTER_AUTH_API_KEY",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "RESEND_API_KEY",
+        "EMAIL_FROM",
+        "OPENAI_API_KEY",
+        "OPENAI_CHAT_MODEL",
+        "OPENAI_EMBEDDING_MODEL",
+        "GLOBAL_AI_BUDGET_USD",
+        "WORKSPACE_AI_REPLY_LIMIT",
+        "MAX_APPROVED_KNOWLEDGE_BYTES",
+        "MAX_WORKSPACE_MESSAGES",
+        "MAX_WEBSITE_SOURCES"
+      ]
     }
   }
 }
