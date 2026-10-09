@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: nthawi-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: nthawi
+      POSTGRES_USER: nthawi_dev
+      POSTGRES_PASSWORD: dev-only-change-me
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nthawi_dev -d nthawi"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:
