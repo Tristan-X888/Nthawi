@@ -1,9 +1,53 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { cleanupTestContainers } from "./check-api-image.mjs"
+import {
+  cleanupTestContainers,
+  verifyOfflineHealth,
+} from "./check-api-image.mjs"
 
 const names = ["nthawi-step3-test", "nthawi-step3-invalid-test"]
+
+function healthFetch(liveStatus = 200, readyStatus = 503, cache = "no-store") {
+  return async (url, options) => {
+    assert.ok(options.signal instanceof AbortSignal)
+    return Response.json(
+      url.endsWith("/health/live")
+        ? { status: "ok" }
+        : { status: "not_ready", code: "API_NOT_READY" },
+      {
+        status: url.endsWith("/health/live") ? liveStatus : readyStatus,
+        headers: { "Cache-Control": cache },
+      }
+    )
+  }
+}
+
+test("rejects incomplete or sensitive public health response fields", async () => {
+  for (const body of [
+    {},
+    { status: "not_ready", code: "API_NOT_READY", details: "secret-sentinel" },
+  ]) {
+    await assert.rejects(
+      verifyOfflineHealth(async (url) =>
+        Response.json(url.endsWith("/health/live") ? { status: "ok" } : body, {
+          status: url.endsWith("/health/live") ? 200 : 503,
+          headers: { "Cache-Control": "no-store" },
+        })
+      )
+    )
+  }
+})
+
+test("the isolated image remains live while readiness reports unavailable databases", async () => {
+  await verifyOfflineHealth(healthFetch())
+})
+
+test("offline health fails on broken liveness, accidental readiness, or cacheable health", async () => {
+  await assert.rejects(verifyOfflineHealth(healthFetch(503, 503)))
+  await assert.rejects(verifyOfflineHealth(healthFetch(200, 200)))
+  await assert.rejects(verifyOfflineHealth(healthFetch(200, 503, "public")))
+})
 
 test("cleans each owned name, including the invalid-startup container", () => {
   const calls = []

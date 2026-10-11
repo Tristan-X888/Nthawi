@@ -49,6 +49,7 @@
         "API_PORT",
         "API_TRUST_PROXY",
         "DATABASE_URL",
+        "AUTH_DATABASE_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
         "BETTER_AUTH_API_KEY",

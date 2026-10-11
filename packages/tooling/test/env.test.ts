@@ -8,6 +8,7 @@ function validEnv(): NodeJS.ProcessEnv {
     WEB_ORIGIN: "http://localhost:3000",
     WIDGET_ORIGIN: "http://localhost:5173",
     DATABASE_URL: "postgresql://test:test@localhost:5433/test",
+    AUTH_DATABASE_URL: "postgresql://auth:auth@localhost:5433/test",
     BETTER_AUTH_SECRET: "test-only-secret-with-at-least-32-characters",
     BETTER_AUTH_URL: "http://localhost:4000",
     GOOGLE_CLIENT_ID: "test-client-id",
@@ -69,6 +70,7 @@ for (const field of [
   "EMAIL_FROM",
   "OPENAI_API_KEY",
   "DATABASE_URL",
+  "AUTH_DATABASE_URL",
   "BETTER_AUTH_SECRET",
 ]) {
   test(`${field} is required and rejects empty or whitespace-only values`, () => {
@@ -137,6 +139,11 @@ test("validates real HTTP origins, PostgreSQL URLs, sender mailboxes and port ra
     /DATABASE_URL/
   )
   assert.throws(
+    () =>
+      loadServerEnv({ ...validEnv(), AUTH_DATABASE_URL: "https://db.test" }),
+    /AUTH_DATABASE_URL/
+  )
+  assert.throws(
     () => loadServerEnv({ ...validEnv(), API_PORT: "65536" }),
     /API_PORT/
   )
@@ -148,6 +155,20 @@ test("validates real HTTP origins, PostgreSQL URLs, sender mailboxes and port ra
       }),
     /EMAIL_FROM/
   )
+})
+
+test("keeps auth and business credentials distinct and strips administrator credentials", () => {
+  const env = loadServerEnv({
+    ...validEnv(),
+    DATABASE_MIGRATION_URL: "postgresql://admin:private@localhost/test",
+    RLS_TEST_ADMIN_URL: "postgresql://admin:private@localhost/test",
+    AUTH_TEST_ADMIN_URL: "postgresql://admin:private@localhost/test",
+  })
+  assert.equal(env.AUTH_DATABASE_URL, validEnv().AUTH_DATABASE_URL)
+  assert.equal(env.DATABASE_URL, validEnv().DATABASE_URL)
+  assert.equal("DATABASE_MIGRATION_URL" in env, false)
+  assert.equal("RLS_TEST_ADMIN_URL" in env, false)
+  assert.equal("AUTH_TEST_ADMIN_URL" in env, false)
 })
 
 test("dashboard key is optional and blank does not silently enable the plugin", () => {

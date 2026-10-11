@@ -6,6 +6,8 @@ import type { AppDatabase } from '@nthawi/db';
 import { getAllowedAuthOrigins, type ServerEnv } from '@nthawi/tooling/env';
 import { createAuthEmailSender, type SendAuthEmail } from './email.js';
 import { AUTH_CLIENT_IP_HEADER } from './http.constants.js';
+import { authLogger } from './logger.js';
+import { OWNER_SESSION_FRESH_SECONDS } from './policy.js';
 
 export function createAuth(
   env: ServerEnv,
@@ -13,6 +15,7 @@ export function createAuth(
   sendEmail: SendAuthEmail = createAuthEmailSender(env),
 ) {
   return betterAuth({
+    logger: authLogger,
     appName: 'Nthawi',
     baseURL: env.BETTER_AUTH_URL,
     basePath: '/api/auth',
@@ -38,7 +41,7 @@ export function createAuth(
       deleteUser: { enabled: true },
     },
     session: {
-      freshAge: 60 * 15,
+      freshAge: OWNER_SESSION_FRESH_SECONDS,
     },
     emailAndPassword: {
       enabled: true,

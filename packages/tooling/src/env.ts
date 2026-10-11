@@ -67,6 +67,7 @@ export const serverEnvSchema = z
     API_PORT: z.coerce.number().int().positive().max(65535).default(4000),
     API_TRUST_PROXY: trustedProxies,
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
+    AUTH_DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     BETTER_AUTH_SECRET: z
       .string()
       .min(32)
