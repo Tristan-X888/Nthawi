@@ -5,6 +5,23 @@ $ErrorActionPreference = 'Stop'
 $Step4RepositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $Step4PackageManager = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { 'pnpm.cmd' } else { 'pnpm' }
 
+function Set-Step4ProcessEnvironment {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][AllowNull()][AllowEmptyString()][object]$Value
+    )
+    # Keep null distinct from an empty string. PowerShell 7.5's .NET method
+    # binding turns null into an empty value; the Env provider can remove it.
+    $variablePath = 'Env:' + $Name
+    if ($null -eq $Value) {
+        if (Test-Path -LiteralPath $variablePath) {
+            Remove-Item -LiteralPath $variablePath -ErrorAction Stop
+        }
+    } else {
+        Set-Item -LiteralPath $variablePath -Value $Value -ErrorAction Stop
+    }
+}
+
 function Invoke-Step4Native {
     param([Parameter(Mandatory)][string]$File, [string[]]$Arguments)
     # PowerShell 7 CI shells may enable native-error promotion. Handle exit
@@ -45,7 +62,7 @@ function Invoke-Step4Verification {
         Invoke-Step4Native 'git' @('diff', '--exit-code', '--', 'pnpm-lock.yaml')
 
         foreach ($name in $environment.Keys) {
-            [Environment]::SetEnvironmentVariable($name, $environment[$name], 'Process')
+            Set-Step4ProcessEnvironment -Name $name -Value $environment[$name]
         }
         # Explicit empty env-file prevents Compose from reading the developer's .env.
         $environmentFile = [System.IO.Path]::GetTempFileName()
@@ -79,7 +96,7 @@ function Invoke-Step4Verification {
             $failures.Add($_.Exception)
         } finally {
             foreach ($name in $originalEnvironment.Keys) {
-                [Environment]::SetEnvironmentVariable($name, $originalEnvironment[$name], 'Process')
+                Set-Step4ProcessEnvironment -Name $name -Value $originalEnvironment[$name]
             }
             Pop-Location
         }

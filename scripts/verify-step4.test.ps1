@@ -26,7 +26,7 @@ function Invoke-Step4Native {
     if ($Arguments -contains 'down' -and $script:FailCleanup) { throw 'cleanup failed' }
 }
 
-function Test-Lifecycle([bool]$FailGate, [bool]$FailCleanup, [string]$NodeVersion = 'v24.21.0', [bool]$FailStartup = $false) {
+function Test-Lifecycle([bool]$FailGate, [bool]$FailCleanup, [string]$NodeVersion = 'v24.21.0', [bool]$FailStartup = $false, [bool]$PublicUrlWasEmpty = $false) {
     $script:Calls = [System.Collections.Generic.List[object]]::new()
     $script:FailGate = $FailGate
     $script:FailCleanup = $FailCleanup
@@ -39,12 +39,22 @@ function Test-Lifecycle([bool]$FailGate, [bool]$FailCleanup, [string]$NodeVersio
     try {
         $env:RLS_TEST_ADMIN_URL = 'restore-original-test-sentinel'
         $env:AUTH_TEST_ADMIN_URL = 'restore-auth-test-sentinel'
-        [Environment]::SetEnvironmentVariable('NEXT_PUBLIC_API_URL', $null, 'Process')
+        Set-Step4ProcessEnvironment -Name 'NEXT_PUBLIC_API_URL' -Value $null
+        if ($PublicUrlWasEmpty) {
+            Set-Step4ProcessEnvironment -Name 'NEXT_PUBLIC_API_URL' -Value ''
+            Assert-GateCondition ((Test-Path -LiteralPath 'Env:NEXT_PUBLIC_API_URL') -and '' -ceq [Environment]::GetEnvironmentVariable('NEXT_PUBLIC_API_URL', 'Process')) 'Empty environment fixture was not established'
+        } else {
+            Assert-GateCondition (-not (Test-Path -LiteralPath 'Env:NEXT_PUBLIC_API_URL')) 'Absent environment fixture was not established'
+        }
         $failure = $null
         try { Invoke-Step4Verification } catch { $failure = $_.Exception }
         Assert-GateCondition ($env:RLS_TEST_ADMIN_URL -eq 'restore-original-test-sentinel') 'Administrator environment was not restored'
         Assert-GateCondition ($env:AUTH_TEST_ADMIN_URL -eq 'restore-auth-test-sentinel') 'Auth administrator environment was not restored'
-        Assert-GateCondition ($null -eq [Environment]::GetEnvironmentVariable('NEXT_PUBLIC_API_URL', 'Process')) 'Absent environment variable was not restored'
+        if ($PublicUrlWasEmpty) {
+            Assert-GateCondition ((Test-Path -LiteralPath 'Env:NEXT_PUBLIC_API_URL') -and '' -ceq [Environment]::GetEnvironmentVariable('NEXT_PUBLIC_API_URL', 'Process')) 'Empty environment variable was not restored'
+        } else {
+            Assert-GateCondition (-not (Test-Path -LiteralPath 'Env:NEXT_PUBLIC_API_URL') -and $null -eq [Environment]::GetEnvironmentVariable('NEXT_PUBLIC_API_URL', 'Process')) 'Absent environment variable was not restored'
+        }
         Assert-GateCondition ((Get-Location).Path -eq $previousDirectory) 'Working directory was not restored'
         $starts = @($script:Calls | Where-Object { $_.Arguments -contains 'up' })
         $cleanups = @($script:Calls | Where-Object { $_.Arguments -contains 'down' })
@@ -70,9 +80,9 @@ function Test-Lifecycle([bool]$FailGate, [bool]$FailCleanup, [string]$NodeVersio
             }
         }
     } finally {
-        [Environment]::SetEnvironmentVariable('RLS_TEST_ADMIN_URL', $previousUrl, 'Process')
-        [Environment]::SetEnvironmentVariable('AUTH_TEST_ADMIN_URL', $previousAuthUrl, 'Process')
-        [Environment]::SetEnvironmentVariable('NEXT_PUBLIC_API_URL', $previousPublicUrl, 'Process')
+        Set-Step4ProcessEnvironment -Name 'RLS_TEST_ADMIN_URL' -Value $previousUrl
+        Set-Step4ProcessEnvironment -Name 'AUTH_TEST_ADMIN_URL' -Value $previousAuthUrl
+        Set-Step4ProcessEnvironment -Name 'NEXT_PUBLIC_API_URL' -Value $previousPublicUrl
     }
 }
 
@@ -82,9 +92,16 @@ Test-Lifecycle $false $true
 Test-Lifecycle $true $true
 Test-Lifecycle $false $false 'v22.19.0'
 Test-Lifecycle $false $false 'v24.21.0' $true
+$lifecycleCases = 6
+# Empty process variables are supported starting in PowerShell 7.5. They must
+# remain present and empty rather than being restored as absent.
+if ($PSVersionTable.PSVersion -ge [Version]'7.5') {
+    Test-Lifecycle $false $false -PublicUrlWasEmpty $true
+    $lifecycleCases++
+}
 # GitHub's pwsh shell appends this native-state check after the script returns.
 # A deliberately caught failure must not make a successful harness fail CI.
 if (Test-Path variable:LASTEXITCODE) {
     Assert-GateCondition ($LASTEXITCODE -eq 0) 'GitHub PowerShell exit trailer would report a failed harness'
 }
-Write-Host 'Step 4 lifecycle tests passed (6 cases plus native exit regression).'
+Write-Host "Step 4 lifecycle tests passed ($lifecycleCases cases plus native exit regression)."
