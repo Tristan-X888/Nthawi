@@ -1,13 +1,12 @@
 ﻿import assert from "node:assert/strict"
-import { randomUUID } from "node:crypto"
-import { fileURLToPath } from "node:url"
+import { randomBytes, randomUUID } from "node:crypto"
 import { test } from "node:test"
 import { sql } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/node-postgres"
-import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { Client, Pool } from "pg"
 import { knowledgeSources } from "../src/schema/app.ts"
 import { withTenantTransaction } from "../src/tenant.ts"
+import { createDatabaseTestFixture } from "./helpers/database-fixture.mjs"
 
 const adminUrl = process.env.RLS_TEST_ADMIN_URL
 if (!adminUrl) {
@@ -168,15 +167,14 @@ function insertRow(table: string, row: Record<string, unknown>) {
 }
 
 await test("tenant RLS against PostgreSQL", async (t) => {
-  const suffix = randomUUID().replaceAll("-", "")
-  const database = `rls_test_${suffix}`
-  const runtimeRole = `${database}_runtime`
+  const fixture = await createDatabaseTestFixture(adminUrl)
+  const database = fixture.databaseName
+  const runtimeRole = fixture.roles.business
   const ownerRole = `${database}_owner`
   const bypassRole = `${database}_bypass`
   const admin = new Client({ connectionString: adminUrl })
   const pools: Pool[] = []
   const roles: string[] = []
-  let createdDatabase = false
   await admin.connect()
   try {
     assert.equal(
@@ -188,29 +186,19 @@ await test("tenant RLS against PostgreSQL", async (t) => {
       true,
       "test setup requires a local superuser"
     )
-    await admin.query(`CREATE DATABASE "${database}"`)
-    createdDatabase = true
-    const connectionUrl = new URL(adminUrl)
-    connectionUrl.pathname = `/${database}`
-    const setup = new Pool({
-      connectionString: connectionUrl.toString(),
-      max: 1,
-    })
-    pools.push(setup)
-    await setup.query("CREATE EXTENSION vector")
-    await setup.query("CREATE EXTENSION pgcrypto")
-    await migrate(drizzle(setup), {
-      migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)),
-    })
-    // The migration journal must also make a second run harmless.
-    await migrate(drizzle(setup), {
-      migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)),
-    })
-    for (const role of [runtimeRole, ownerRole, bypassRole]) {
+    const setup = fixture.pools.admin
+    const roleUrls = new Map([[runtimeRole, fixture.urls.business]])
+    for (const role of [ownerRole, bypassRole]) {
+      const password = randomBytes(32).toString("hex")
       await admin.query(
-        `CREATE ROLE "${role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT ${role === bypassRole ? "BYPASSRLS" : "NOBYPASSRLS"}`
+        `CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT ${role === bypassRole ? "BYPASSRLS" : "NOBYPASSRLS"}`
       )
       roles.push(role)
+      const login = new URL(fixture.urls.business)
+      login.username = role
+      login.password = password
+      roleUrls.set(role, login.toString())
+      await setup.query(`GRANT CONNECT ON DATABASE "${database}" TO "${role}"`)
       await setup.query(`GRANT USAGE ON SCHEMA public TO "${role}"`)
       for (const table of protectedTables) {
         await setup.query(
@@ -232,8 +220,7 @@ await test("tenant RLS against PostgreSQL", async (t) => {
     }
     const connectAs = (role: string) => {
       const pool = new Pool({
-        connectionString: connectionUrl.toString(),
-        options: `-c role=${role}`,
+        connectionString: roleUrls.get(role),
         max: 1,
       })
       pools.push(pool)
@@ -356,12 +343,9 @@ await test("tenant RLS against PostgreSQL", async (t) => {
           ).rowCount,
           0
         )
-        assert.equal(
-          (await tx.execute(sql`DELETE FROM workspaces`)).rowCount,
-          0
-        )
       })
       for (const query of [
+        sql`DELETE FROM workspaces`,
         sql`UPDATE workspaces SET owner_id = ${ownerB} WHERE id = ${workspaceA}`,
         sql`INSERT INTO workspaces (owner_id, name, website_origin) VALUES (${ownerA}, 'Denied', 'https://new.test')`,
       ]) {
@@ -378,6 +362,69 @@ await test("tenant RLS against PostgreSQL", async (t) => {
         )
       })
     })
+
+    await t.test(
+      "same-owner workspaces still isolate tenant content",
+      async () => {
+        const sameOwnerWorkspace = randomUUID()
+        await setup.query(
+          "INSERT INTO workspaces (id, owner_id, name, website_origin) VALUES ($1, $2, 'Same owner', 'https://same-owner.test')",
+          [sameOwnerWorkspace, ownerA]
+        )
+        await setup.query(
+          "INSERT INTO knowledge_sources (workspace_id, type, title) VALUES ($1, 'text', 'Same-owner secret')",
+          [sameOwnerWorkspace]
+        )
+        try {
+          await asTenant(async (tx) => {
+            assert.equal(
+              (await tx.execute(sql`SELECT id FROM workspaces`)).rowCount,
+              2
+            )
+            assert.deepEqual(
+              (
+                await tx.execute(
+                  sql`SELECT workspace_id FROM knowledge_sources`
+                )
+              ).rows,
+              [{ workspace_id: workspaceA }]
+            )
+          })
+          await withTenantTransaction(
+            db,
+            { ownerId: ownerA, workspaceId: sameOwnerWorkspace },
+            async (tx) => {
+              assert.deepEqual(
+                (await tx.execute(sql`SELECT title FROM knowledge_sources`))
+                  .rows,
+                [{ title: "Same-owner secret" }]
+              )
+            }
+          )
+        } finally {
+          await setup.query("DELETE FROM workspaces WHERE id = $1", [
+            sameOwnerWorkspace,
+          ])
+        }
+      }
+    )
+
+    await t.test(
+      "composite foreign keys reject cross-workspace relationships",
+      async () => {
+        for (const query of [
+          sql`INSERT INTO knowledge_revisions (workspace_id, source_id, ordinal, content_hash) VALUES (${workspaceA}, ${rowsB.get("knowledge_sources")!.id}, 99, 'cross-workspace')`,
+          sql`INSERT INTO knowledge_chunks (workspace_id, revision_id, ordinal, content, token_count, embedding_model, embedding_dimensions, embedding) VALUES (${workspaceA}, ${rowsB.get("knowledge_revisions")!.id}, 99, 'cross-workspace', 1, 'test', 1536, ${JSON.stringify(Array(1536).fill(0))}::vector)`,
+          sql`INSERT INTO messages (workspace_id, conversation_id, sequence, sender, body) VALUES (${workspaceA}, ${rowsB.get("conversations")!.id}, 99, 'visitor', 'cross-workspace')`,
+        ]) {
+          await assert.rejects(
+            asTenant((tx) => tx.execute(query)),
+            (error: unknown) =>
+              (error as { cause?: { code?: string } }).cause?.code === "23503"
+          )
+        }
+      }
+    )
 
     for (const table of tenantTables) {
       await t.test(
@@ -663,7 +710,7 @@ await test("tenant RLS against PostgreSQL", async (t) => {
     await Promise.all(pools.map((pool) => pool.end()))
     // Only this run's generated database and roles are removed.
     try {
-      if (createdDatabase) await admin.query(`DROP DATABASE "${database}"`)
+      await fixture.close()
       for (const role of roles) await admin.query(`DROP ROLE "${role}"`)
     } finally {
       await admin.end()

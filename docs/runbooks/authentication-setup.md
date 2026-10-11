@@ -14,9 +14,11 @@ mounted on the API under `/api/auth`; its Google callback is therefore
 container maps host port **5433** to container port 5432.
 
 The supplied example used port 5432 and pointed Better Auth at the web app.
-Those values were corrected to match this repository. `DATABASE_URL` must use a
-non-superuser runtime role. `DATABASE_MIGRATION_URL` is a separate administrator
-connection used only by the migration runner.
+Those values were corrected to match this repository. The API now requires
+`AUTH_DATABASE_URL` for the restricted identity role and `DATABASE_URL` for the
+separate restricted business role. `DATABASE_MIGRATION_URL` is the dedicated
+migrator connection used only in the operator environment. See the
+[Step4 provisioning instructions](step-4-verification.md).
 
 Identity authentication and tenant authorization remain separate. Better Auth
 manages users, passwords, OAuth accounts, sessions, verification records and
@@ -358,57 +360,28 @@ Reference: [Better Auth CLI](https://better-auth.com/docs/concepts/cli).
 Proceed when the generated migration contains only the intended identity changes
 and the existing tenant RLS migration remains intact.
 
-## 11. Provision the local PostgreSQL runtime role
+## 11. Provision the local PostgreSQL runtime roles
 
 Start PostgreSQL with `pnpm.cmd db:up`. Existing Docker volumes retain their
 original credentials even if the Compose example password later changes. Use
 the actual administrator password for that instance; do not reset the volume.
 
-Apply migrations using the separate migration connection. The runner reads
-`DATABASE_MIGRATION_URL` from the process environment, so load it from your secret
-manager or run the documented Node command with the local `.env`:
+Follow the [Step4 provisioning instructions](step-4-verification.md) to create
+separate migrator/auth/business/jobs LOGIN profiles, apply the checked migrations,
+and reconcile runtime privileges with `db:provision-runtime`. These instructions
+supersede the former combined `nthawi_runtime` role and manual identity/business
+grants. Existing roles need profile and privilege reconciliation rather than
+blind recreation.
 
-```powershell
-pnpm.cmd --filter @nthawi/db exec node --env-file=../../.env scripts/migrate.mjs
-```
+Load `DATABASE_MIGRATION_URL` from the secret manager into the operator process;
+it must authenticate as the named restricted migrator that owns the target
+database. The Compose bootstrap superuser is for administrative setup. Keep
+migrator credentials outside the API environment.
 
-Connect using an administrator (for local Compose):
-
-```powershell
-docker exec -it nthawi-postgres psql -U nthawi_dev -d nthawi
-```
-
-Create the runtime role once, then set its password interactively:
-
-```sql
-CREATE ROLE nthawi_runtime LOGIN NOSUPERUSER NOBYPASSRLS
-  NOCREATEDB NOCREATEROLE NOINHERIT;
-\password nthawi_runtime
-GRANT CONNECT ON DATABASE nthawi TO nthawi_runtime;
-GRANT USAGE ON SCHEMA public TO nthawi_runtime;
-GRANT SELECT, INSERT, UPDATE, DELETE ON
-  public."user", public."session", public."account",
-  public."verification", public."rate_limit"
-TO nthawi_runtime;
-GRANT SELECT, UPDATE ON public.workspaces TO nthawi_runtime;
-GRANT SELECT, INSERT, UPDATE, DELETE ON
-  public.assistants, public.knowledge_sources, public.knowledge_revisions,
-  public.knowledge_chunks, public.widget_installations, public.visitor_sessions,
-  public.conversations, public.messages, public.citations, public.ai_invocations,
-  public.monthly_usage
-TO nthawi_runtime;
-```
-
-If the role already exists, inspect it and correct its privileges instead of
-recreating it. Do not grant membership in owner or bypass roles, table ownership,
-TRUNCATE or all-table/default privileges. Operational tables remain privileged.
-
-Put the runtime password in `DATABASE_URL`, using URL percent-encoding for reserved
-characters. Keep the administrator URL in `DATABASE_MIGRATION_URL` only. Do not
-use the Compose bootstrap superuser to serve tenant requests.
-
-Proceed when migrations succeed and the runtime role has the explicit privileges
-above without RLS bypass rights.
+Configure both API connections: `AUTH_DATABASE_URL` uses the identity role and
+`DATABASE_URL` uses the distinct business role. Use URL percent-encoding for
+reserved password characters. Proceed when migrations and runtime provisioning
+succeed and both database capabilities pass readiness checks.
 
 ## 12. Run and exercise the authentication flows
 
@@ -526,7 +499,7 @@ permission to create temporary databases and roles:
 
 ```powershell
 $dbPort = (docker compose -f infra/compose.dev.yml port postgres 5432 | Select-Object -First 1).Split(':')[-1]
-$env:AUTH_TEST_ADMIN_URL = "postgresql://nthawi_dev:dev-only-change-me@localhost:${dbPort}/postgres"
+$env:AUTH_TEST_ADMIN_URL = "postgresql://nthawi_dev:dev-only-change-me@127.0.0.1:${dbPort}/postgres"
 $env:RLS_TEST_ADMIN_URL = $env:AUTH_TEST_ADMIN_URL
 pnpm.cmd --filter @nthawi/api test:integration
 pnpm.cmd --filter @nthawi/db test:integration
@@ -563,13 +536,15 @@ names and refuses to start rather than inventing credentials.
    `serverEnv` is the same validated object used by the HTTP bootstrap.
    Prerequisite for advancing: all required server fields pass validation.
 
-2. **`createDatabase()` constructs one pool and binds the full schema.** The
-   pool permits up to ten connections and has a ten-second connection timeout.
-   It opens connections only when a query is executed. Passing both schema
-   families lets the adapter resolve generated identity table names without
-   depending on an import cycle from the config to the generated file.
-   Prerequisite for real requests: the runtime role, database and migrations
-   must exist. A successful schema-generation command does not establish this.
+2. **`auth.ts` constructs two lazy pools with distinct capabilities.**
+   `AUTH_DATABASE_URL` supplies Better Auth's identity connection; `DATABASE_URL`
+   supplies the business connection. Production limits each pool to five
+   connections and uses two-second connection/query/statement timeouts.
+   `createApiResources()` owns idempotent cleanup of both pools. The full schema
+   binding lets the auth adapter resolve generated identity table names without
+   an import cycle. The restricted roles, reviewed migrations and runtime grants
+   must exist before real requests; schema generation alone does not establish
+   readiness. See the [current foundation composition](step-4-verification.md).
 
 3. **`createAuth()` is the reusable configuration factory.** Runtime passes the
    validated environment and real Drizzle database. Tests pass a database with

@@ -5,8 +5,9 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['test/auth.integration.spec.ts'],
+    include: ['test/**/*.integration.spec.ts'],
+    fileParallelism: false,
     testTimeout: 30_000,
-    hookTimeout: 30_000,
+    hookTimeout: 60_000,
   },
 });

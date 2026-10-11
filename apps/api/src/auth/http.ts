@@ -27,6 +27,7 @@ export async function configureAuthHttp(
 
   await fastify.register(async (router) => {
     router.addHook('onRequest', async (request, reply) => {
+      reply.header('cache-control', 'no-store');
       const origin = request.headers.origin;
       // CORS restricts response access; this guard also rejects cookie-free
       // requests from other origins. OAuth and server clients can omit Origin.
@@ -102,6 +103,7 @@ export async function configureAuthHttp(
           });
           const cookies = response.headers.getSetCookie();
           if (cookies.length > 0) reply.header('set-cookie', cookies);
+          reply.header('cache-control', 'no-store');
           return reply.send(body);
         } catch {
           // Error messages, URLs, bodies and headers can contain credentials.

@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
+    environment:
+      POSTGRES_DB: nthawi_test
+      POSTGRES_USER: testadmin
+      POSTGRES_PASSWORD: synthetic-test-password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "127.0.0.1:5434:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testadmin -d nthawi_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

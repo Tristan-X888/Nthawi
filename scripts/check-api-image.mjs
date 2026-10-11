@@ -80,6 +80,7 @@ const syntheticEnvironment = {
   BETTER_AUTH_URL: "https://app.example.test",
   WIDGET_ORIGIN: "https://widget.example.test",
   DATABASE_URL: "postgresql://smoke:smoke@127.0.0.1:1/smoke",
+  AUTH_DATABASE_URL: "postgresql://auth:auth@127.0.0.1:1/smoke",
   BETTER_AUTH_SECRET:
     "synthetic-container-test-secret-that-is-never-used-for-real-auth",
   GOOGLE_CLIENT_ID: "synthetic-client",
@@ -102,6 +103,44 @@ const startupProbe = `
     process.exit(1);
   }
 `
+
+// This same function runs inside the network-isolated production container.
+// Keep it self-contained so the unit checks exercise the actual probe.
+export async function verifyOfflineHealth(fetchResponse = fetch) {
+  for (const [endpoint, expectedStatus] of [
+    ["live", 200],
+    ["ready", 503],
+  ]) {
+    const response = await fetchResponse(
+      `http://127.0.0.1:4000/health/${endpoint}`,
+      { signal: AbortSignal.timeout(4_500) }
+    )
+    if (response.status !== expectedStatus) {
+      throw new Error(`Unexpected ${endpoint} health status`)
+    }
+    if (response.headers.get("cache-control") !== "no-store") {
+      throw new Error(`Cacheable ${endpoint} health response`)
+    }
+    let body
+    try {
+      body = await response.json()
+    } catch {
+      throw new Error(`Invalid ${endpoint} health response`)
+    }
+    const expected =
+      endpoint === "live"
+        ? { status: "ok" }
+        : { status: "not_ready", code: "API_NOT_READY" }
+    if (
+      body === null ||
+      typeof body !== "object" ||
+      Object.keys(body).length !== Object.keys(expected).length ||
+      Object.entries(expected).some(([key, value]) => body[key] !== value)
+    ) {
+      throw new Error(`Unexpected ${endpoint} health response fields`)
+    }
+  }
+}
 
 export async function checkApiImage(image = "nthawi-api:step3") {
   const container = `nthawi-step3-${randomUUID()}`
@@ -151,6 +190,8 @@ export async function checkApiImage(image = "nthawi-api:step3") {
     }
 
     assert.ok(ready, "Compiled API did not become reachable")
+
+    execute(container, `await (${verifyOfflineHealth.toString()})();`)
 
     execute(
       container,
@@ -272,7 +313,7 @@ export async function checkApiImage(image = "nthawi-api:step3") {
   if (failure) throw failure
 
   console.log(
-    "API image passed startup, exports, user, environment and shutdown checks."
+    "API image passed startup, health, exports, user, environment and shutdown checks."
   )
 }
 

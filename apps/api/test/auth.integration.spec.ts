@@ -1,17 +1,19 @@
-import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { Test } from '@nestjs/testing';
-import {
-  FastifyAdapter,
-  type NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createDatabase } from '@nthawi/db';
 import { loadServerEnv } from '@nthawi/tooling/env';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import {
+  createDatabaseTestFixture,
+  type DatabaseTestFixture,
+} from '../../../packages/db/test/helpers/database-fixture.mjs';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  createApiApplication,
+  createApiResources,
+  type ApiResources,
+} from '../src/application.js';
 import { createAuth } from '../src/auth/create-auth.js';
-import { configureAuthHttp } from '../src/auth/http.js';
 import type { AuthEmail } from '../src/auth/email.js';
 
 const adminUrl = process.env.AUTH_TEST_ADMIN_URL;
@@ -19,9 +21,6 @@ if (!adminUrl)
   throw new Error(
     'Set AUTH_TEST_ADMIN_URL to a local disposable PostgreSQL superuser connection.',
   );
-const suffix = randomUUID().replaceAll('-', '');
-const databaseName = `auth_test_${suffix}`;
-const roleName = `${databaseName}_runtime`;
 const mail: AuthEmail[] = [];
 const env = loadServerEnv({
   NODE_ENV: 'test',
@@ -30,18 +29,19 @@ const env = loadServerEnv({
   BETTER_AUTH_URL: 'http://localhost:4000',
   BETTER_AUTH_SECRET: 'test-only-secret-for-auth-integration-0123456789',
   DATABASE_URL: adminUrl,
+  AUTH_DATABASE_URL: adminUrl,
+  API_TRUST_PROXY: '127.0.0.1/32,::1/128',
   GOOGLE_CLIENT_ID: 'test-google-client',
   GOOGLE_CLIENT_SECRET: 'test-google-secret',
   RESEND_API_KEY: 'test-resend-key',
   EMAIL_FROM: 'Nthawi <auth@example.test>',
   OPENAI_API_KEY: 'test-openai-key',
 });
-const admin = createDatabase(adminUrl);
+let databaseFixture: DatabaseTestFixture | undefined;
 let setup: ReturnType<typeof createDatabase> | undefined;
 let runtime: ReturnType<typeof createDatabase> | undefined;
+let resources: ApiResources | undefined;
 let app: NestFastifyApplication | undefined;
-let createdDatabase = false;
-let createdRole = false;
 let ip = 1;
 
 function post(
@@ -86,68 +86,183 @@ async function passwordAccount(email: string) {
 }
 
 beforeAll(async () => {
-  expect(
-    (
-      await admin.pool.query(
-        'SELECT rolsuper FROM pg_roles WHERE rolname = current_user',
-      )
-    ).rows[0].rolsuper,
-  ).toBe(true);
-  await admin.pool.query(`CREATE DATABASE "${databaseName}"`);
-  createdDatabase = true;
-  const databaseUrl = new URL(adminUrl);
-  databaseUrl.pathname = `/${databaseName}`;
-  setup = createDatabase(databaseUrl.toString());
-  await setup.pool.query('CREATE EXTENSION vector');
-  await setup.pool.query('CREATE EXTENSION pgcrypto');
-  await migrate(setup.db, {
-    migrationsFolder: fileURLToPath(
-      new URL('../../../packages/db/drizzle', import.meta.url),
-    ),
-  });
-  await admin.pool.query(
-    `CREATE ROLE "${roleName}" NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`,
+  databaseFixture = await createDatabaseTestFixture(adminUrl);
+  env.AUTH_DATABASE_URL = databaseFixture.urls.auth;
+  env.DATABASE_URL = databaseFixture.urls.business;
+  setup = createDatabase(databaseFixture.urls.admin);
+  runtime = createDatabase(databaseFixture.urls.auth, { max: 2 });
+  resources = createApiResources(
+    runtime,
+    createDatabase(databaseFixture.urls.business, { max: 2 }),
   );
-  createdRole = true;
-  await setup.pool.query(`GRANT USAGE ON SCHEMA public TO "${roleName}"`);
-  await setup.pool.query(
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON public."user", public."session", public."account", public."verification", public."rate_limit" TO "${roleName}"`,
-  );
-  databaseUrl.searchParams.set('options', `-c role=${roleName}`);
-  runtime = createDatabase(databaseUrl.toString());
   const auth = createAuth(env, runtime.db, async (message) => {
     mail.push(message);
   });
-  const fixture = await Test.createTestingModule({}).compile();
-  app = fixture.createNestApplication<NestFastifyApplication>(
-    // Supertest connects through loopback; only these peers may supply test IPs.
-    new FastifyAdapter({
-      trustProxy: ['127.0.0.1/32', '::1/128'],
-      logger: false,
-    }),
-    { logger: false },
-  );
-  await configureAuthHttp(app, auth, env);
-  await app.init();
-  await app.getHttpAdapter().getInstance().ready();
+  app = await createApiApplication({ env, auth, resources, logger: false });
 });
 
 afterAll(async () => {
   try {
     await app?.close();
   } finally {
-    await Promise.all([runtime?.pool.end(), setup?.pool.end()]);
     try {
-      if (createdDatabase)
-        await admin.pool.query(`DROP DATABASE "${databaseName}"`);
-      if (createdRole) await admin.pool.query(`DROP ROLE "${roleName}"`);
+      await resources?.close();
     } finally {
-      await admin.pool.end();
+      try {
+        await setup?.pool.end();
+      } finally {
+        await databaseFixture?.close();
+      }
     }
   }
 });
 
 describe('Better Auth over Nest/Fastify and PostgreSQL', () => {
+  it('serves database-independent liveness through the application', async () => {
+    const response = await request(app!.getHttpServer()).get('/health/live');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('reports readiness using restricted runtime database capabilities', async () => {
+    const response = await request(app!.getHttpServer()).get('/health/ready');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ready' });
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('returns an allowlisted owner summary using the authenticated session', async () => {
+    const owner = await passwordAccount('me-owner@example.test');
+    const response = await request(app!.getHttpServer())
+      .get('/api/v1/me')
+      .set('Cookie', owner.cookie)
+      .set('Origin', env.WEB_ORIGIN);
+    expect(response.status).toBe(200);
+    expect(response.body.owner).toEqual({
+      id: owner.id,
+      name: 'Account Owner',
+      email: 'me-owner@example.test',
+      emailVerified: true,
+    });
+    expect(Object.keys(response.body).sort()).toEqual(['owner', 'session']);
+    expect(Object.keys(response.body.session).sort()).toEqual([
+      'createdAt',
+      'expiresAt',
+      'freshUntil',
+    ]);
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('rejects missing and invalid owner cookies without caching errors', async () => {
+    for (const cookie of [undefined, 'better-auth.session_token=invalid']) {
+      const call = request(app!.getHttpServer()).get('/api/v1/me');
+      if (cookie) call.set('Cookie', cookie);
+      const response = await call;
+      expect(response.status).toBe(401);
+      expect(response.headers['cache-control']).toBe('no-store');
+    }
+  });
+
+  it('uses the authoritative session after revocation and expiry', async () => {
+    const owner = await passwordAccount('revocation-owner@example.test');
+    expect(
+      (await post('/sign-out', {}).set('Cookie', owner.cookie)).status,
+    ).toBe(200);
+    const revoked = await request(app!.getHttpServer())
+      .get('/api/v1/me')
+      .set('Cookie', owner.cookie);
+    expect(revoked.status).toBe(401);
+    expect(revoked.headers['cache-control']).toBe('no-store');
+
+    const expiring = await passwordAccount('expiry-owner@example.test');
+    await setup!.pool.query(
+      "UPDATE public.session SET expires_at = now() - interval '1 second' WHERE user_id = $1",
+      [expiring.id],
+    );
+    const expired = await request(app!.getHttpServer())
+      .get('/api/v1/me')
+      .set('Cookie', expiring.cookie);
+    expect(expired.status).toBe(401);
+  });
+
+  it('rejects a session whose owner is no longer email verified', async () => {
+    const owner = await passwordAccount('unverified-owner@example.test');
+    await setup!.pool.query(
+      'UPDATE public."user" SET email_verified = false WHERE id = $1',
+      [owner.id],
+    );
+    const response = await request(app!.getHttpServer())
+      .get('/api/v1/me')
+      .set('Cookie', owner.cookie);
+    expect(response.status).toBe(403);
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('rejects foreign owner origins before database session access', async () => {
+    const owner = await passwordAccount('origin-owner@example.test');
+    const role = databaseFixture!.roles.auth;
+    await setup!.pool.query(`REVOKE SELECT ON public.session FROM "${role}"`);
+    try {
+      for (const origin of [
+        env.WIDGET_ORIGIN,
+        'https://attacker.example.test',
+        'null',
+      ]) {
+        const response = await request(app!.getHttpServer())
+          .get('/api/v1/me')
+          .set('Origin', origin)
+          .set('Cookie', owner.cookie);
+        expect(response.status).toBe(403);
+        expect(response.headers['cache-control']).toBe('no-store');
+      }
+    } finally {
+      await setup!.pool.query(`GRANT SELECT ON public.session TO "${role}"`);
+    }
+  });
+
+  it('sanitizes authentication failures and readiness when identity access fails', async () => {
+    const owner = await passwordAccount('database-failure-owner@example.test');
+    const token = (
+      await setup!.pool.query(
+        'SELECT token FROM public.session WHERE user_id = $1',
+        [owner.id],
+      )
+    ).rows[0].token as string;
+    const errors: unknown[][] = [];
+    const output = vi
+      .spyOn(console, 'error')
+      .mockImplementation((...args: unknown[]) => {
+        errors.push(args);
+      });
+    const role = databaseFixture!.roles.auth;
+    await setup!.pool.query(`REVOKE SELECT ON public.session FROM "${role}"`);
+    try {
+      const response = await request(app!.getHttpServer())
+        .get('/api/v1/me')
+        .set('Cookie', owner.cookie);
+      expect(response.status).toBe(503);
+      expect(response.headers['cache-control']).toBe('no-store');
+      const ready = await request(app!.getHttpServer()).get('/health/ready');
+      expect(ready.status).toBe(503);
+      expect(ready.headers['cache-control']).toBe('no-store');
+      expect(ready.body).toMatchObject({
+        status: 'not_ready',
+        code: 'API_NOT_READY',
+      });
+      const live = await request(app!.getHttpServer()).get('/health/live');
+      expect(live.status).toBe(200);
+      const exposed = JSON.stringify({ body: response.body, errors });
+      expect(exposed).not.toContain(token);
+      expect(exposed).not.toContain(owner.cookie);
+      expect(exposed).not.toContain(databaseFixture!.urls.auth);
+      expect(exposed).not.toContain('permission denied');
+    } finally {
+      await setup!.pool.query(`GRANT SELECT ON public.session TO "${role}"`);
+      output.mockRestore();
+    }
+  });
+
   it('mounts the auth handler and keeps identity tables outside tenant RLS', async () => {
     const response = await request(app!.getHttpServer()).get('/api/auth/ok');
     expect(response.status).toBe(200);

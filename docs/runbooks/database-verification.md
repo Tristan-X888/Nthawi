@@ -49,7 +49,7 @@ docker compose -f infra/compose.dev.yml port postgres 5432
 ```
 
 Persist `POSTGRES_HOST_PORT=55433` in the private root `.env` for later Compose
-invocations. Update the port in both `DATABASE_URL` and `DATABASE_MIGRATION_URL`.
+invocations. Update the port in `AUTH_DATABASE_URL`, `DATABASE_URL` and `DATABASE_MIGRATION_URL`.
 Write the actual port explicitly in each URL; Node's environment loader does not
 expand a Compose variable inside a URL. The commands below discover the actual published port from the running Compose
 service. This also works in a new PowerShell session because `db:up` explicitly
@@ -131,7 +131,7 @@ password authentication. Use the same PostgreSQL driver as the application:
 
 ```powershell
 $dbPort = (docker compose -f infra/compose.dev.yml port postgres 5432 | Select-Object -First 1).Split(':')[-1]
-$env:RLS_TEST_ADMIN_URL = "postgresql://nthawi_dev:dev-only-change-me@localhost:${dbPort}/postgres"
+$env:RLS_TEST_ADMIN_URL = "postgresql://nthawi_dev:dev-only-change-me@127.0.0.1:${dbPort}/postgres"
 $env:AUTH_TEST_ADMIN_URL = $env:RLS_TEST_ADMIN_URL
 
 @'
@@ -219,20 +219,16 @@ as proof that the intended schema is installed.
 ## 6. Apply migrations only when preparing the application database
 
 This is an operator action that changes `nthawi`. Integration verification does
-not require it. Confirm the local target before running:
+not require it. Follow the [Step4 provisioning instructions](step-4-verification.md)
+for separate migrator/auth/business/jobs LOGIN roles and the checked migration and
+runtime-grant commands. This supersedes the earlier bootstrap-superuser migration
+and manual business-role setup, including for local development.
 
-```powershell
-$dbPort = (docker compose -f infra/compose.dev.yml port postgres 5432 | Select-Object -First 1).Split(':')[-1]
-$env:DATABASE_MIGRATION_URL = "postgresql://nthawi_dev:dev-only-change-me@localhost:${dbPort}/nthawi"
-pnpm.cmd --filter @nthawi/db db:check
-if ($LASTEXITCODE -ne 0) { throw 'Migration metadata check failed.' }
-pnpm.cmd --filter @nthawi/db db:migrate
-if ($LASTEXITCODE -ne 0) { throw 'Application database migration failed.' }
-```
-
-Use a dedicated migration administrator outside local development. The migration
-runner requires `DATABASE_MIGRATION_URL` directly in its process environment;
-the test URLs and application `DATABASE_URL` do not replace it.
+The migration runner requires `DATABASE_MIGRATION_URL` directly in its process
+environment, authenticating as the named restricted migrator that owns the target
+database. The API requires separate `AUTH_DATABASE_URL` for identity access and
+`DATABASE_URL` for business access. Test administrator URLs do not replace these
+connections; the Compose `nthawi_dev` account is for administrative bootstrap.
 
 After applying, repeat the history and table queries from step 5 and the RLS
 queries from step 7. Do not edit previously applied migration SQL, reorder journal
@@ -263,14 +259,15 @@ owner SELECT/UPDATE policies. Better Auth's `user`, `session`, `account`,
 The privileged operational tables also remain outside it; lack of RLS there does
 not authorize granting a tenant role access to them.
 
-Inspect the provisioned application login, if present:
+Inspect the provisioned business login, if present; substitute its actual role
+name if it differs from the Step4 example:
 
 ```powershell
-docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = 'nthawi_runtime';"
+docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT rolname, rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = 'nthawi_business';"
 
-docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT granted.rolname AS reachable_role, granted.rolsuper, granted.rolbypassrls, granted.rolcreatedb, granted.rolcreaterole FROM pg_roles AS runtime CROSS JOIN pg_roles AS granted WHERE runtime.rolname = 'nthawi_runtime' AND pg_has_role(runtime.oid, granted.oid, 'MEMBER') ORDER BY granted.rolname;"
+docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT granted.rolname AS reachable_role, granted.rolsuper, granted.rolbypassrls, granted.rolcreatedb, granted.rolcreaterole FROM pg_roles AS runtime CROSS JOIN pg_roles AS granted WHERE runtime.rolname = 'nthawi_business' AND pg_has_role(runtime.oid, granted.oid, 'MEMBER') ORDER BY granted.rolname;"
 
-docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT schemaname, tablename, tableowner FROM pg_tables WHERE tableowner = 'nthawi_runtime' ORDER BY schemaname, tablename;"
+docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT schemaname, tablename, tableowner FROM pg_tables WHERE tableowner = 'nthawi_business' ORDER BY schemaname, tablename;"
 ```
 
 The membership query returns no rows when the runtime role is absent.
@@ -282,7 +279,7 @@ does not mean that role verification passed.
 To inspect effective privileges after the role exists:
 
 ```powershell
-docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT tablename, has_table_privilege('nthawi_runtime', format('%I.%I', schemaname, tablename), 'SELECT') AS can_select, has_table_privilege('nthawi_runtime', format('%I.%I', schemaname, tablename), 'INSERT') AS can_insert, has_table_privilege('nthawi_runtime', format('%I.%I', schemaname, tablename), 'UPDATE') AS can_update, has_table_privilege('nthawi_runtime', format('%I.%I', schemaname, tablename), 'DELETE') AS can_delete, has_table_privilege('nthawi_runtime', format('%I.%I', schemaname, tablename), 'TRUNCATE') AS can_truncate FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;"
+docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi -c "SELECT tablename, has_table_privilege('nthawi_business', format('%I.%I', schemaname, tablename), 'SELECT') AS can_select, has_table_privilege('nthawi_business', format('%I.%I', schemaname, tablename), 'INSERT') AS can_insert, has_table_privilege('nthawi_business', format('%I.%I', schemaname, tablename), 'UPDATE') AS can_update, has_table_privilege('nthawi_business', format('%I.%I', schemaname, tablename), 'DELETE') AS can_delete, has_table_privilege('nthawi_business', format('%I.%I', schemaname, tablename), 'TRUNCATE') AS can_truncate FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;"
 ```
 
 Expected for the business-only role contract: SELECT/UPDATE on `workspaces`, CRUD
@@ -290,38 +287,15 @@ on the eleven business tables, no TRUNCATE, and no access to identity or privile
 operational tables. An authentication service needing identity access requires
 separately reviewed identity grants; do not solve that with grants on all tables.
 
-Optional provisioning commands for a missing local business role are:
+For missing or existing runtime roles, use the
+[Step4 provisioning instructions](step-4-verification.md). The provisioning CLI
+validates profiles and reconciles table, column and schema privileges, including
+migration-journal SELECT needed for readiness. The former manual business grants
+are not a complete runtime provisioning procedure.
 
-```powershell
-docker compose -f infra/compose.dev.yml exec postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d nthawi
-```
-
-Inside that interactive `psql` session, run this only when the role is absent:
-
-```sql
-CREATE ROLE nthawi_runtime LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
-```
-
-Set its password through psql's prompt, then grant the documented business access:
-
-```text
-\password nthawi_runtime
-```
-
-```sql
-GRANT USAGE ON SCHEMA public TO nthawi_runtime;
-GRANT SELECT, UPDATE ON public.workspaces TO nthawi_runtime;
-GRANT SELECT, INSERT, UPDATE, DELETE ON
-  public.assistants, public.knowledge_sources, public.knowledge_revisions,
-  public.knowledge_chunks, public.widget_installations, public.visitor_sessions,
-  public.conversations, public.messages, public.citations, public.ai_invocations,
-  public.monthly_usage
-TO nthawi_runtime;
-```
-
-Exit with `\q`. These commands are documented operator steps, not automatic
-provisioning. They do not remove unsafe pre-existing grants or memberships; audit
-an existing role rather than assuming new GRANT statements constrain its access.
+An administrator must resolve unsafe role flags, memberships or ownership
+rejected by provisioning. Inspect existing roles instead of assuming additional
+GRANT statements constrain their access.
 
 Verify actual application credentials after provisioning and configuring the
 private root `.env`:
@@ -354,7 +328,7 @@ verify the application login, password, database selection, or startup.
 
 ```powershell
 $dbPort = (docker compose -f infra/compose.dev.yml port postgres 5432 | Select-Object -First 1).Split(':')[-1]
-$env:RLS_TEST_ADMIN_URL = "postgresql://nthawi_dev:dev-only-change-me@localhost:${dbPort}/postgres"
+$env:RLS_TEST_ADMIN_URL = "postgresql://nthawi_dev:dev-only-change-me@127.0.0.1:${dbPort}/postgres"
 $env:AUTH_TEST_ADMIN_URL = $env:RLS_TEST_ADMIN_URL
 pnpm.cmd test:integration
 if ($LASTEXITCODE -ne 0) { throw 'Database integration verification failed.' }
@@ -373,22 +347,22 @@ pnpm.cmd --filter @nthawi/db test:integration
 pnpm.cmd --filter @nthawi/api test:integration
 ```
 
-The tenant suite creates an `rls_test_...` database and generated runtime, owner,
-and bypass roles. It applies the migrations twice, seeds two tenants, checks
-read/write boundaries across all eleven business tables, owner policies, invalid
-and missing context, transaction commit/rollback cleanup, stale session context,
-FORCE RLS, and intentional superuser/BYPASSRLS behavior. Its single-connection
-pool regression verifies physical connection reuse without tenant-context leaks.
+The suites create uniquely named `step4_...` databases and real restricted
+migrator/auth/business/jobs LOGIN roles, plus explicit privileged negative
+controls. Database coverage includes clean/upgrade/repeat migrations, effective
+privileges, schema compatibility, all eleven tenant tables, owner policies,
+missing/malformed context, commit/rollback cleanup and single-connection reuse.
 
-The auth suite creates an `auth_test_...` database and restricted identity role.
-It uses the real Nest/Fastify bridge and PostgreSQL with test credentials and
-captured emails. It does not send real emails or redeem a real Google OAuth code.
-Neither suite installs schema or fixture rows into `nthawi`.
+API coverage uses the same production application factory and captured emails.
+It verifies authenticated owner responses, session revocation, origins, health,
+workspace authorization, vector dimensions/ordering/isolation and restricted
+queue claiming/retries/completion. It does not send real emails or redeem a real
+Google OAuth code. No suite installs schema or fixture rows into `nthawi`.
 
 After a successful run, inspect any remaining generated resources:
 
 ```powershell
-docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d postgres -c "SELECT datname FROM pg_database WHERE starts_with(datname, 'rls_test_') OR starts_with(datname, 'auth_test_') ORDER BY datname; SELECT rolname FROM pg_roles WHERE starts_with(rolname, 'rls_test_') OR starts_with(rolname, 'auth_test_') ORDER BY rolname;"
+docker compose -f infra/compose.dev.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U nthawi_dev -d postgres -c "SELECT datname FROM pg_database WHERE starts_with(datname, 'step4_') OR starts_with(datname, 'rls_test_') OR starts_with(datname, 'auth_test_') ORDER BY datname; SELECT rolname FROM pg_roles WHERE starts_with(rolname, 'step4_') OR starts_with(rolname, 'rls_test_') OR starts_with(rolname, 'auth_test_') ORDER BY rolname;"
 ```
 
 Compare with the same query before testing. Successful suites clean up their own
