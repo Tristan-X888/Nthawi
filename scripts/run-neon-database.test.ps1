@@ -138,12 +138,17 @@ try {
     $failure = $null
     try { Invoke-NeonDatabase -Mode migrate -EnvironmentDirectory $fixtureDirectory | Out-Null } catch { $failure = $_.Exception }
     Assert-NeonCondition ($null -ne $failure -and $script:Calls.Count -eq 0 -and $env:DATABASE_URL -ceq 'inherited-production-sentinel') 'Production credentials were accepted or configuration failure lost the original environment.'
-    Write-Host 'Neon runner regression checks passed (9 lifecycle cases, configuration rejection, environment isolation, and native failure handling).'
+    # Dotfiles are hidden on Linux; exercise the equivalent protected-file
+    # cleanup on Windows instead of depending only on Unix CI to catch it.
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        [IO.File]::SetAttributes($runtimePath, ([IO.FileAttributes]::Hidden -bor [IO.FileAttributes]::ReadOnly))
+    }
+    Write-Host 'Neon runner regression checks passed (9 lifecycle cases, configuration rejection, environment isolation, native failure handling, and protected fixture cleanup).'
 } finally {
     foreach ($name in $original.Keys) { Set-NeonProcessEnvironment $name $original[$name] }
     foreach ($path in @($runtimePath, $operatorPath, $entrypointPath)) {
         if (-not [IO.Path]::GetFullPath($path).StartsWith($fixtureDirectory + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Refusing cleanup outside the synthetic fixture directory.' }
-        if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path }
+        if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
     }
     foreach ($directory in @($entrypointScripts, $entrypointDirectory)) {
         if ([IO.Directory]::Exists($directory)) { [IO.Directory]::Delete($directory, $false) }

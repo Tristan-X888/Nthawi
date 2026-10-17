@@ -96,6 +96,12 @@ files and raised one minor issue: the earlier API unit count in this record was
 stale. It is corrected to 52. The subsequent review of the final three changed
 runtime-budget/documentation files raised 0 issues. No code issue was raised.
 
+The first hosted Neon run passed its lifecycle assertions but exposed PowerShell's
+hidden-dotfile cleanup restriction on Linux. Fixture deletion now uses `-Force`
+after its existing path check. The Windows regression marks the synthetic runtime
+fixture hidden/read-only so protected-file cleanup is exercised locally too.
+Final hosted results belong to the final published PR head, not that earlier run.
+
 PR #4 must pass hosted checks at the published implementation SHA and obtain the
 one independent approving review required by the active `Protect master` ruleset.
 The PR author cannot provide that independent approval. Do not bypass this rule.
