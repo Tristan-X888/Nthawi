@@ -52,8 +52,8 @@ advisory still needs a separately reviewed dependency update.
 Readiness now reads its 13 catalog datasets in a single read-only SQL batch.
 The three-second probe and four-second HTTP deadlines remain unchanged. The
 latency integration test covers a cold connection and delayed network round trips
-while still rejecting excess grants. API connection setup permits three seconds
-for verified remote TLS/login; query and statement limits remain two seconds.
+while still rejecting excess grants. API connection setup permits ten seconds
+for cold verified TLS/login; query and statement limits are three and two seconds.
 After HTTP starts, the API warms both runtime logins concurrently in the
 background. A failed connection never blocks liveness or turns readiness green.
 Successful connections are released into their bounded pools for readiness to
@@ -116,6 +116,36 @@ Retain the accepted commit, migration hashes and bounded success lines in the
 delivery record. Record the final live result before closing this subgate. The
 runner restores the caller's environment; it does not leave an API running or
 operator credentials loaded.
+
+Live Linux acceptance also passed with `shutdown_mode=os-sigterm`. Reproduce it
+using the image built by the baseline runner; no secrets are supplied in Docker
+arguments or written into the image:
+
+```powershell
+& {
+    $ErrorActionPreference = 'Stop'
+    . .\scripts\run-neon-database.ps1
+    $neonImageValues = Read-NeonTestEnvironment -Directory (Get-Location).Path
+    $neonImageSnapshot = @{}
+    try {
+        $neonImageArgs = @('run', '--rm', '--name', ('nthawi-neon-linux-' + [Guid]::NewGuid().ToString('N')),
+            '--mount', ('type=bind,source=' + (Join-Path (Get-Location).Path 'scripts') + ',target=/app/scripts,readonly'))
+        foreach ($name in $neonImageValues.Keys) {
+            $neonImageSnapshot[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+            Set-NeonProcessEnvironment $name $neonImageValues[$name]
+            $neonImageArgs += @('--env', $name)
+        }
+        $neonImageArgs += @('nthawi-api:step4', 'node', 'scripts/verify-neon-api.mjs')
+        & docker @neonImageArgs
+        if ($LASTEXITCODE -ne 0) { throw 'Linux compiled Neon API acceptance failed.' }
+    } finally {
+        foreach ($name in $neonImageSnapshot.Keys) {
+            Set-NeonProcessEnvironment $name $neonImageSnapshot[$name]
+        }
+        $neonImageValues.Clear()
+    }
+}
+```
 
 ## 3. Start the API for development or manual checks
 

@@ -69,11 +69,20 @@ NEON_API_ACCEPTANCE_PASSED shutdown_mode=ipc-sigterm-hook
 
 The actual compiled API returned correct non-cacheable live/ready responses,
 anonymous owner rejection and widget-origin rejection; both database pools closed.
-Windows uses the explicitly labelled Nest shutdown hook over IPC. Linux's actual
-OS-signal evidence is recorded separately after image acceptance. Container
+Windows uses the explicitly labelled Nest shutdown hook over IPC. Linux live
+acceptance also passed on the final image, with the exact diagnostic:
+
+```text
+NEON_API_ACCEPTANCE_PASSED shutdown_mode=os-sigterm
+```
+
+Accepted image: `nthawi-api:step4`,
+`sha256:4aa4ebf133cfe3cfd4d8058ed4acc7cd8b1e823b80554007def89637f1531f48`.
+The container was removed after successful acceptance. Container
 diagnostics found a verified login taking 2.38s, beyond the former 2s pool setup
-limit. The API now permits 3s for setup and warms both runtime logins after HTTP
-starts; the 3s DB/4s HTTP readiness deadlines and 2s query limits are unchanged.
+limit; another cold login took 4.86s as network latency varied. The API now permits
+10s for setup and warms both runtime logins after HTTP starts. Query execution is
+bounded at 3s, statements at 2s, and DB/HTTP readiness remain bounded at 3s/4s.
 The two new resource tests pass (52 API unit tests total), covering concurrent
 warmup, released clients and sanitized failures.
 
@@ -84,7 +93,8 @@ live role/schema agreement and bootstrap environment isolation. The initial
 authenticated CodeRabbit review completed over all 24 then-changed files and
 raised 0 issues. The final authenticated CodeRabbit review covered all 29 changed
 files and raised one minor issue: the earlier API unit count in this record was
-stale. It is corrected to 52. No code issue was raised by that review.
+stale. It is corrected to 52. The subsequent review of the final three changed
+runtime-budget/documentation files raised 0 issues. No code issue was raised.
 
 PR #4 must pass hosted checks at the published implementation SHA and obtain the
 one independent approving review required by the active `Protect master` ruleset.
