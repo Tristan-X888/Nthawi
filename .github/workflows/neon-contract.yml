@@ -1,0 +1,71 @@
+name: Verify Neon contracts
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  neon-contract:
+    name: Neon contract verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24.21.0"
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "10.16.1"
+          run_install: false
+          cache: true
+          cache_dependency_path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Drizzle migrations
+        run: pnpm --filter @nthawi/db db:check
+
+      - name: Check schema manifest
+        run: pnpm --filter @nthawi/db db:manifest:check
+
+      - name: Build database package
+        run: pnpm --filter @nthawi/db build
+
+      - name: Verify Neon target boundaries
+        run: node --test scripts/neon-targets.test.mjs
+
+      - name: Verify Neon database validator
+        run: node --test scripts/verify-neon-database.test.mjs
+
+      - name: Build compiled API and its workspace dependencies
+        run: pnpm exec turbo run build --filter=@nthawi/api
+
+      - name: Verify compiled API acceptance lifecycle without Neon credentials
+        run: node --test scripts/verify-neon-api.test.mjs
+
+      - name: Verify migration entry point syntax
+        run: |
+          node --check packages/db/scripts/migrate.mjs
+          node --check packages/db/scripts/provision-runtime.mjs
+
+      - name: Verify isolated runner lifecycle
+        shell: pwsh
+        run: ./scripts/run-neon-database.test.ps1

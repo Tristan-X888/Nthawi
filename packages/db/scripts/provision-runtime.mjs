@@ -5,6 +5,8 @@ import { provisionRuntimeRoles, provisionJobsSchema } from "./role-profiles.mjs"
 import {
   guardNeonMigrationTarget,
   assertNeonTestSession,
+  neonTestConnectionOptions,
+  withVerifiedNeonClient,
 } from "../../../scripts/neon-targets.mjs"
 
 // Obtain the dedicated migration database connection.
@@ -33,11 +35,13 @@ if (!connectionString || Object.values(roles).some((role) => !role)) {
 // Existing local PostgreSQL development remains supported.
 const isNeonTest = guardNeonMigrationTarget(process.env)
 
-// Preserve the existing controlled PostgreSQL pool.
+// Use explicit verified TLS for Neon and preserve the local pool configuration.
 const pool = new Pool({
-  connectionString,
+  ...(isNeonTest
+    ? neonTestConnectionOptions(process.env)
+    : { connectionString }),
   max: 1,
-  connectionTimeoutMillis: 2_000,
+  connectionTimeoutMillis: isNeonTest ? 10_000 : 2_000,
   statement_timeout: 5_000,
 })
 
@@ -50,20 +54,26 @@ try {
   // any runtime-role provisioning statements.
   //
   // This check is only required for the approved Neon test branch.
-  if (isNeonTest) {
-    await assertNeonTestSession(pool)
-  }
-
-  // Provision application runtime grants using the existing
-  // reviewed role-profiles implementation.
-  await provisionRuntimeRoles(pool, roles)
-
+  // Provision application runtime grants using the same checked client and
+  // the existing reviewed role-profiles implementation.
   // Preserve explicit jobs-schema provisioning.
   //
   // Jobs schema provisioning is only executed when --jobs
   // is provided to the script.
-  if (process.argv.includes("--jobs")) {
-    await provisionJobsSchema(pool, roles.jobs)
+  const provision = async (connection) => {
+    if (isNeonTest) {
+      await assertNeonTestSession(connection)
+    }
+    await provisionRuntimeRoles(connection, roles)
+    if (process.argv.includes("--jobs")) {
+      await provisionJobsSchema(connection, roles.jobs)
+    }
+  }
+
+  if (isNeonTest) {
+    await withVerifiedNeonClient(pool, provision)
+  } else {
+    await provision(pool)
   }
 
   console.log("Database runtime grants provisioned")

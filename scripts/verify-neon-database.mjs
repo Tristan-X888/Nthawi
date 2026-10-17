@@ -1,8 +1,13 @@
 import { resolve } from "node:path"
+import { createRequire } from "node:module"
 import { pathToFileURL } from "node:url"
-import { createDatabase, probeDatabase } from "../packages/db/dist/index.js"
-
-const TARGET_HOST = "ep-wild-leaf-za09k0vy.c-2.eu-west-2.aws.neon.tech"
+import {
+  assertNeonTestEnvironment,
+  assertVerifiedNeonClient,
+  neonTestConnectionOptions,
+  resolveNeonTarget,
+  withVerifiedNeonClient,
+} from "./neon-targets.mjs"
 
 const TARGET_DATABASE = "neondb"
 const TARGET_VERSION = 18
@@ -51,7 +56,7 @@ function fail(code, stage, cause) {
   throw new NeonVerificationError(code, stage, cause)
 }
 
-function validateConnection(environment, profile) {
+function validateConnection(environment, profile, target) {
   const value = environment[profile.variable]
 
   if (typeof value !== "string" || !value.trim()) {
@@ -61,10 +66,13 @@ function validateConnection(environment, profile) {
     )
   }
 
-  let url
+  let url, username, password, database
 
   try {
     url = new URL(value)
+    username = decodeURIComponent(url.username)
+    password = decodeURIComponent(url.password)
+    database = decodeURIComponent(url.pathname.slice(1))
   } catch {
     fail(
       "NEON_CONNECTION_CONFIGURATION_INVALID",
@@ -77,11 +85,12 @@ function validateConnection(environment, profile) {
   const valid =
     environment[profile.roleVariable] === profile.role &&
     ["postgres:", "postgresql:"].includes(url.protocol) &&
-    url.hostname === TARGET_HOST &&
-    (url.port === "" || url.port === "5432") &&
-    decodeURIComponent(url.pathname.slice(1)) === TARGET_DATABASE &&
-    decodeURIComponent(url.username) === profile.role &&
-    url.password.length > 0 &&
+    url.hostname === target.host &&
+    url.port === "5432" &&
+    database === target.database &&
+    username === profile.role &&
+    password.length > 0 &&
+    !password.includes("\0") &&
     url.hash === "" &&
     parameters.length === 1 &&
     parameters[0][0] === "sslmode" &&
@@ -101,7 +110,15 @@ function validateConnection(environment, profile) {
 }
 
 export function readNeonConnections(environment) {
-  return PROFILES.map((profile) => validateConnection(environment, profile))
+  let target
+  try {
+    target = resolveNeonTarget(environment)
+  } catch {
+    fail("NEON_CONNECTION_CONFIGURATION_INVALID", "configuration:target")
+  }
+  return PROFILES.map((profile) =>
+    validateConnection(environment, profile, target)
+  )
 }
 
 async function verifyProfile(handle, profile) {
@@ -189,14 +206,7 @@ async function verifyProfile(handle, profile) {
               'pgboss'
             )
         )
-      ) AS owns_objects,
-
-      EXISTS (
-        SELECT 1
-        FROM pg_stat_ssl
-        WHERE pid = pg_backend_pid()
-          AND ssl
-      ) AS tls
+      ) AS owns_objects
 
     FROM pg_roles r
 
@@ -220,17 +230,16 @@ async function verifyProfile(handle, profile) {
     login_matches: row.login_matches,
     version_matches: row.version_matches,
     safe_flags: row.safe_flags,
-    no_memberships: !row.memberships,
-    tls: row.tls,
+    no_memberships: row.memberships === false,
     database_ownership: row.owns_database === isMigrator,
   }
 
   if (!isMigrator) {
-    requiredChecks.no_temporary_privilege = !row.temporary_privilege
+    requiredChecks.no_temporary_privilege = row.temporary_privilege === false
 
-    requiredChecks.no_public_create = !row.creates_public
+    requiredChecks.no_public_create = row.creates_public === false
 
-    requiredChecks.no_object_ownership = !row.owns_objects
+    requiredChecks.no_object_ownership = row.owns_objects === false
   }
 
   for (const [check, passed] of Object.entries(requiredChecks)) {
@@ -291,7 +300,7 @@ async function verifyEmptyTarget(handle) {
   }
 }
 
-async function verifyApplicationReadiness(handles) {
+async function verifyApplicationReadiness(handles, probeDatabase) {
   for (const capability of ["auth", "business"]) {
     const entry = handles.find(({ profile }) => profile.kind === capability)
 
@@ -326,27 +335,73 @@ async function verifyApplicationReadiness(handles) {
   }
 }
 
-export async function verifyNeonDatabase(environment, mode) {
-  if (!["--before-migrate", "--after-migrate"].includes(mode)) {
+export async function verifyNeonDatabase(environment, mode, dependencies) {
+  if (
+    !["--check-config", "--before-migrate", "--after-migrate"].includes(mode)
+  ) {
     fail("NEON_VERIFICATION_MODE_INVALID", "arguments")
   }
 
+  // Production resolution is available for configuration inspection only.
+  // Every executable verifier mode is confined to the isolated test branch.
+  try {
+    assertNeonTestEnvironment(environment)
+  } catch {
+    fail("NEON_CONNECTION_CONFIGURATION_INVALID", "configuration:test-target")
+  }
   const connections = readNeonConnections(environment)
+  if (mode === "--check-config") {
+    console.log("NEON_CONFIGURATION_VERIFIED target=test")
+    return
+  }
+  if (environment.NODE_TLS_REJECT_UNAUTHORIZED === "0") {
+    fail("NEON_TLS_CONFIGURATION_UNSAFE", "configuration:tls")
+  }
   const handles = []
 
   let currentStage = "initialization"
   let primaryError
 
   try {
+    currentStage = "initialization:database-package"
+    // Configuration checks work on a fresh checkout without compiled packages.
+    const { Pool, probeDatabase } = dependencies ?? {
+      Pool: createRequire(
+        new URL("../packages/db/package.json", import.meta.url)
+      )("pg").Pool,
+      probeDatabase: (await import("../packages/db/dist/index.js"))
+        .probeDatabase,
+    }
     for (const profile of connections) {
       currentStage = `connection:${profile.kind}`
 
-      const handle = createDatabase(profile.connectionString, {
+      const pool = new Pool({
+        ...neonTestConnectionOptions(environment, profile.variable),
         max: 1,
         connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
-        queryTimeoutMillis: QUERY_TIMEOUT_MS,
-        statementTimeoutMillis: STATEMENT_TIMEOUT_MS,
+        query_timeout: QUERY_TIMEOUT_MS,
+        statement_timeout: STATEMENT_TIMEOUT_MS,
       })
+      pool.on("error", () => {})
+      // All queries, including application probes after reconnect, use a
+      // certificate-verified client. pg_stat_ssl describes Neon's internal hop.
+      const handle = {
+        pool: {
+          query: (...args) =>
+            withVerifiedNeonClient(pool, (client) => client.query(...args)),
+          connect: async () => {
+            const client = await pool.connect()
+            try {
+              assertVerifiedNeonClient(client)
+              return client
+            } catch (error) {
+              client.release(true)
+              throw error
+            }
+          },
+          end: () => pool.end(),
+        },
+      }
 
       handles.push({ profile, handle })
 
@@ -365,7 +420,7 @@ export async function verifyNeonDatabase(environment, mode) {
     } else {
       currentStage = "after-migrate:readiness"
 
-      await verifyApplicationReadiness(handles)
+      await verifyApplicationReadiness(handles, probeDatabase)
 
       console.log("NEON_APPLICATION_READINESS_VERIFIED")
     }

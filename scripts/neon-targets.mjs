@@ -86,6 +86,13 @@ export function assertNeonTestEnvironment(env) {
       reject()
     }
 
+    let password
+    try {
+      password = decodeURIComponent(url.password)
+    } catch {
+      reject()
+    }
+
     const params = [...url.searchParams.entries()]
 
     if (
@@ -94,7 +101,8 @@ export function assertNeonTestEnvironment(env) {
       url.port !== "5432" ||
       url.pathname !== `/${target.database}` ||
       url.username !== expectedRole ||
-      !url.password ||
+      !password ||
+      password.includes("\0") ||
       url.hash !== "" ||
       params.length !== 1 ||
       params[0][0] !== "sslmode" ||
@@ -110,31 +118,96 @@ export function assertNeonTestEnvironment(env) {
 /**
  * Protect Neon-specific migration operations.
  *
- * When a Neon endpoint or explicit NEON_TARGET is detected,
- * require the complete approved test-branch configuration.
+ * Neon endpoints require the complete approved test-branch configuration.
+ * Unselected connections are limited to ordinary local loopback URLs.
  *
  * Existing local PostgreSQL / Docker migration commands
  * remain compatible with this guard.
  *
  * Returns:
  * - true: Approved Neon test environment.
- * - false: Local/non-Neon connection without NEON_TARGET.
+ * - false: Local loopback connection without NEON_TARGET.
  */
 export function guardNeonMigrationTarget(env) {
-  let hostname
+  let url
 
   try {
-    hostname = new URL(env.DATABASE_MIGRATION_URL).hostname
+    url = new URL(env.DATABASE_MIGRATION_URL)
   } catch {
     reject()
   }
+
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "")
 
   if (hostname.endsWith(".neon.tech") || env.NEON_TARGET !== undefined) {
     assertNeonTestEnvironment(env)
     return true
   }
 
+  // pg accepts connection options in the query string, including a host that
+  // overrides the URL authority. Only ordinary local URLs may bypass Neon checks.
+  if (
+    !["postgres:", "postgresql:"].includes(url.protocol) ||
+    !["localhost", "127.0.0.1", "[::1]"].includes(hostname) ||
+    [...url.searchParams.keys()].some((key) => key !== "sslmode") ||
+    url.hash !== ""
+  ) {
+    reject()
+  }
+
   return false
+}
+
+// Do not combine sslmode in a connectionString with an ssl object: pg parses
+// the URL last and overwrites the ssl object. Build explicit fields instead.
+export function neonTestConnectionOptions(
+  env,
+  variable = "DATABASE_MIGRATION_URL"
+) {
+  const target = assertNeonTestEnvironment(env)
+  if (!connections.some(([name]) => name === variable)) reject()
+  const url = new URL(env[variable])
+
+  try {
+    return {
+      host: target.host,
+      port: 5432,
+      database: target.database,
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      ssl: { rejectUnauthorized: true, servername: target.host },
+      connectionTimeoutMillis: 10_000,
+    }
+  } catch {
+    reject()
+  }
+}
+
+export function assertVerifiedNeonClient(client) {
+  const stream = client.connection?.stream
+  if (
+    stream?.encrypted !== true ||
+    stream.authorized !== true ||
+    client.ssl === false ||
+    client.ssl?.rejectUnauthorized === false
+  ) {
+    throw new Error("NEON_TLS_SESSION_REJECTED")
+  }
+}
+
+export async function withVerifiedNeonClient(pool, callback) {
+  const client = await pool.connect()
+  let discard = false
+
+  try {
+    assertVerifiedNeonClient(client)
+    return await callback(client)
+  } catch (error) {
+    discard = true
+    throw error
+  } finally {
+    client.release(discard)
+  }
 }
 
 /**
@@ -146,14 +219,15 @@ export function guardNeonMigrationTarget(env) {
  * - Expected database.
  * - Expected migrator identity.
  * - PostgreSQL 18.
- * - Active TLS session.
+ * - Certificate-verified client TLS session.
  * - Database ownership.
  * - pgvector extension availability.
  *
  * No database passwords or connection strings are returned.
  */
-export async function assertNeonTestSession(pool) {
-  const result = await pool.query(`
+export async function assertNeonTestSession(client) {
+  assertVerifiedNeonClient(client)
+  const result = await client.query(`
     SELECT
       current_database() = 'neondb'
         AS database_matches,
@@ -166,13 +240,6 @@ export async function assertNeonTestSession(pool) {
 
       current_setting('server_version_num')::integer / 10000 = 18
         AS version_matches,
-
-      EXISTS (
-        SELECT 1
-        FROM pg_stat_ssl
-        WHERE pid = pg_backend_pid()
-          AND ssl
-      ) AS tls_enabled,
 
       EXISTS (
         SELECT 1
@@ -190,7 +257,15 @@ export async function assertNeonTestSession(pool) {
 
   const row = result.rows[0]
 
-  if (!row || Object.values(row).some((value) => value !== true)) {
+  const checks = [
+    "database_matches",
+    "current_role_matches",
+    "session_role_matches",
+    "version_matches",
+    "ownership_matches",
+    "vector_available",
+  ]
+  if (!row || checks.some((check) => row[check] !== true)) {
     throw new Error("NEON_TEST_SESSION_REJECTED")
   }
 }

@@ -206,6 +206,17 @@ function Invoke-Step4Verification {
             -ForegroundColor Cyan
 
         Invoke-Step4Native `
+            (Get-Process -Id $PID).Path `
+            @(
+                '-NoProfile',
+                '-NonInteractive',
+                '-ExecutionPolicy',
+                'Bypass',
+                '-File',
+                'scripts/verify-step4-lockfile.test.ps1'
+            )
+
+        Invoke-Step4Native `
             $Step4PackageManager `
             @('install', '--frozen-lockfile')
 

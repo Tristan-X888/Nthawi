@@ -3,6 +3,8 @@ import { test } from "node:test"
 import { readFile, mkdtemp, mkdir, writeFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { setTimeout as delay } from "node:timers/promises"
+import type { PoolClient } from "pg"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { createDatabase, probeDatabase } from "../dist/index.js"
@@ -25,6 +27,76 @@ test("test fixture rejects remote hosts and role connection options", () => {
     "postgresql://admin:secret@127.0.0.1/db?options=-c%20role%3Dadmin",
   ])
     assert.throws(() => validateTestAdminUrl(url))
+})
+
+test("readiness preserves its deadline and privilege checks over a latent connection", async () => {
+  const fixture = await createDatabaseTestFixture(adminUrl)
+  const profiles = ["auth", "business"] as const
+  const handles = {
+    auth: createDatabase(fixture.urls.auth, { max: 1 }),
+    business: createDatabase(fixture.urls.business, { max: 1 }),
+  }
+  const queryCounts = { auth: 0, business: 0 }
+  const connections = {
+    auth: handles.auth.pool.connect.bind(handles.auth.pool),
+    business: handles.business.pool.connect.bind(handles.business.pool),
+  }
+  for (const profile of profiles) {
+    handles[profile].pool.connect = async () => {
+      // Model a cold remote connection plus one 200ms network round trip for
+      // each query call. The former sequential probe exceeded 3s on this path.
+      await delay(1_000)
+      const client = await connections[profile]()
+      return {
+        async query(text: string) {
+          queryCounts[profile]++
+          await delay(200)
+          return client.query(text)
+        },
+        release: client.release.bind(client),
+      } as PoolClient
+    }
+  }
+  try {
+    await Promise.all(
+      profiles.map(async (profile) => {
+        const started = Date.now()
+        await probeDatabase(handles[profile], profile)
+        assert.ok(Date.now() - started < 3_000)
+        assert.equal(queryCounts[profile], 1)
+        const client = await connections[profile]()
+        try {
+          const settings = await client.query(
+            "SELECT current_setting('transaction_read_only') AS read_only, current_setting('statement_timeout') AS timeout"
+          )
+          assert.deepEqual(settings.rows[0], {
+            read_only: "off",
+            timeout: "2s",
+          })
+        } finally {
+          client.release()
+        }
+      })
+    )
+    await fixture.pools.admin.query(
+      `GRANT SELECT ON public."user" TO "${fixture.roles.business}"`
+    )
+    try {
+      await assert.rejects(probeDatabase(handles.business, "business"), {
+        message: "Database capability check failed",
+      })
+    } finally {
+      await fixture.pools.admin.query(
+        `REVOKE SELECT ON public."user" FROM "${fixture.roles.business}"`
+      )
+    }
+    assert.equal(queryCounts.business, 2)
+    await probeDatabase(handles.business, "business")
+    assert.equal(queryCounts.business, 3)
+  } finally {
+    await Promise.all(Object.values(handles).map((handle) => handle.pool.end()))
+    await fixture.close()
+  }
 })
 
 test("real LOGIN roles and compatibility probe enforce capability boundaries", async (t) => {

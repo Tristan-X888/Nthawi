@@ -6,6 +6,8 @@ import { Pool } from "pg"
 import {
   guardNeonMigrationTarget,
   assertNeonTestSession,
+  neonTestConnectionOptions,
+  withVerifiedNeonClient,
 } from "../../../scripts/neon-targets.mjs"
 
 // Require a dedicated migration database connection.
@@ -26,9 +28,11 @@ if (!process.env.DATABASE_MIGRATION_URL) {
 // - The original local PostgreSQL migration path is preserved.
 const isNeonTest = guardNeonMigrationTarget(process.env)
 
-// Preserve the existing PostgreSQL connection configuration.
+// Use explicit verified TLS for Neon and preserve the local connection path.
 const pool = new Pool({
-  connectionString: process.env.DATABASE_MIGRATION_URL,
+  ...(isNeonTest
+    ? neonTestConnectionOptions(process.env)
+    : { connectionString: process.env.DATABASE_MIGRATION_URL }),
   max: 1,
 })
 
@@ -39,19 +43,26 @@ try {
   // This confirms:
   // - The expected database and migrator identity.
   // - PostgreSQL 18 compatibility.
-  // - An active TLS session.
+  // - A certificate-verified TLS session.
   // - Expected database ownership.
   // - Availability of the pgvector extension.
-  if (isNeonTest) {
-    await assertNeonTestSession(pool)
-  }
-
-  // Apply existing Drizzle migrations.
+  // Apply existing Drizzle migrations on the same checked client.
   //
   // Do not regenerate, replace, or rewrite migration history.
-  await migrate(drizzle(pool), {
-    migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)),
-  })
+  const applyMigrations = async (connection) => {
+    if (isNeonTest) {
+      await assertNeonTestSession(connection)
+    }
+    await migrate(drizzle(connection), {
+      migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)),
+    })
+  }
+
+  if (isNeonTest) {
+    await withVerifiedNeonClient(pool, applyMigrations)
+  } else {
+    await applyMigrations(pool)
+  }
 } finally {
   // Always release the database pool, including on failure.
   await pool.end()

@@ -63,6 +63,66 @@ test("probe deadline releases a connection that arrives after timeout", async ()
   await handle.pool.end()
 })
 
+test("probe deadline destroys a connection with unfinished catalog work", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] })
+  const handle = createDatabase("postgresql://unused:secret@127.0.0.1:1/unused")
+  const released: boolean[] = []
+  let rejectQuery: (error: Error) => void
+  handle.pool.connect = async () => ({
+    query: () =>
+      new Promise((_, reject) => {
+        rejectQuery = reject
+      }),
+    release: (destroy: boolean) => released.push(destroy),
+  })
+  try {
+    const probe = probeDatabase(handle, "business")
+    const rejected = assert.rejects(probe, {
+      message: "Database capability check failed",
+    })
+    await Promise.resolve()
+    t.mock.timers.tick(3_000)
+    await rejected
+    assert.deepEqual(released, [true])
+    // The destroyed driver's late failure must not escape or release twice.
+    rejectQuery!(new Error("secret database URL and SQL details"))
+    await Promise.resolve()
+    await Promise.resolve()
+    assert.deepEqual(released, [true])
+  } finally {
+    await handle.pool.end()
+  }
+})
+
+test("a malformed or incomplete catalog batch fails closed and discards its connection", async () => {
+  for (const batch of [
+    { command: "SELECT", rows: [] },
+    [
+      { command: "BEGIN", rows: [] },
+      { command: "SET", rows: [] },
+      { command: "SELECT", rows: [] },
+      { command: "ROLLBACK", rows: [] },
+    ],
+  ]) {
+    const handle = createDatabase(
+      "postgresql://unused:secret@127.0.0.1:1/unused"
+    )
+    const released: boolean[] = []
+    handle.pool.connect = async () => ({
+      query: async () => batch,
+      release: (destroy: boolean) => released.push(destroy),
+    })
+    try {
+      await assert.rejects(probeDatabase(handle, "business"), {
+        message: "Database capability check failed",
+      })
+      assert.deepEqual(released, [true])
+    } finally {
+      await handle.pool.end()
+    }
+  }
+})
+
 test("build-time manifest checker rejects migration drift", async () => {
   const directory = await mkdtemp(join(tmpdir(), "nthawi-manifest-"))
   try {
