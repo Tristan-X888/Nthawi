@@ -21,8 +21,9 @@ export const serverEnv = loadServerEnv();
 const databaseOptions = {
   // Two pools cap each API replica at 10 connections; reserve worker/admin capacity.
   max: 5,
-  connectionTimeoutMillis: 2000,
-  queryTimeoutMillis: 2000,
+  // Bound cold TLS/compute startup separately from the 3s readiness probe.
+  connectionTimeoutMillis: 10000,
+  queryTimeoutMillis: 3000,
   statementTimeoutMillis: 2000,
   onIdleError: () => console.error('Database idle connection failed.'),
 };

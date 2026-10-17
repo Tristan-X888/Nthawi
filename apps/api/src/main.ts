@@ -1,6 +1,7 @@
 ﻿import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { auth, resources, serverEnv } from './auth/auth.js';
 import { createApiApplication } from './application.js';
+import { warmApiDatabases } from './resources.js';
 
 async function bootstrap(): Promise<void> {
   let app: NestFastifyApplication | undefined;
@@ -8,6 +9,9 @@ async function bootstrap(): Promise<void> {
     app = await createApiApplication({ env: serverEnv, auth, resources });
     app.enableShutdownHooks();
     await app.listen({ host: '0.0.0.0', port: serverEnv.API_PORT });
+    void warmApiDatabases(resources).catch(() => {
+      console.error('Database connection warmup failed.');
+    });
   } catch (error) {
     try {
       await app?.close();
