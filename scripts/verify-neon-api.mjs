@@ -12,7 +12,10 @@ import { assertNeonTestEnvironment } from "./neon-targets.mjs"
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const apiDirectory = join(repository, "apps", "api")
-const startupTimeout = 45_000
+// Cold module loading on Windows can exceed 45s under local memory/I/O pressure.
+// This listener allowance is separate from the strict readiness acceptance window.
+const startupTimeout = process.platform === "win32" ? 90_000 : 45_000
+const readinessTimeout = 45_000
 const shutdownTimeout = 10_000
 
 export class NeonApiVerificationError extends Error {
@@ -188,7 +191,8 @@ function sameFields(body, expected) {
 export async function verifyApiEndpoints(
   baseUrl,
   fetchResponse = fetch,
-  signal
+  signal,
+  { childClosed = () => false, readinessOptions } = {}
 ) {
   for (const [path, status, expected, origin] of [
     ["/health/live", 200, { status: "ok" }],
@@ -205,6 +209,16 @@ export async function verifyApiEndpoints(
       "https://widget.example.test",
     ],
   ]) {
+    if (path === "/health/ready") {
+      await waitForReadiness(
+        baseUrl,
+        childClosed,
+        signal,
+        fetchResponse,
+        readinessOptions
+      )
+      continue
+    }
     const stage = path === "/api/v1/me" ? "owner-boundary" : path.slice(1)
     let response
     try {
@@ -241,28 +255,136 @@ async function waitForListening(baseUrl, childClosed, signal, fetchResponse) {
   fail("startup")
 }
 
-async function waitForReadiness(baseUrl, childClosed, signal, fetchResponse) {
-  const deadline = Date.now() + startupTimeout
-  while (Date.now() < deadline && !signal.aborted && !childClosed()) {
-    let response
+const readinessNetworkCodes = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ECONNABORTED",
+  "ETIMEDOUT",
+  "EPIPE",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_SOCKET",
+])
+
+function retryableReadinessError(error) {
+  return (
+    error?.name === "TimeoutError" ||
+    error?.name === "AbortError" ||
+    readinessNetworkCodes.has(error?.code) ||
+    readinessNetworkCodes.has(error?.cause?.code)
+  )
+}
+
+/** Retry transient unavailability, never an invalid readiness contract. */
+export async function waitForReadiness(
+  baseUrl,
+  childClosed,
+  signal,
+  fetchResponse,
+  {
+    timeoutMs = readinessTimeout,
+    requestTimeoutMs = 5000,
+    pollIntervalMs = 250,
+    now = () => performance.now(),
+    sleep = delay,
+  } = {}
+) {
+  if (
+    ![timeoutMs, requestTimeoutMs, pollIntervalMs].every(
+      (value) => Number.isSafeInteger(value) && value > 0
+    ) ||
+    timeoutMs > readinessTimeout
+  ) {
+    fail("configuration")
+  }
+
+  const deadline = now() + timeoutMs
+  const assertRunning = () => {
+    if (signal?.aborted) fail("interrupted")
+    if (childClosed()) fail("unexpected-exit")
+  }
+
+  while (now() < deadline) {
+    assertRunning()
+    const attemptTimeout = Math.min(
+      requestTimeoutMs,
+      Math.ceil(deadline - now())
+    )
+    if (attemptTimeout < 1) break
+    const attemptDeadline = now() + attemptTimeout
+    const attempt = new AbortController()
+    const requestSignal = signal
+      ? AbortSignal.any([signal, attempt.signal])
+      : attempt.signal
+    let onAbort
+    const timer = setTimeout(
+      () =>
+        attempt.abort(
+          new DOMException("Readiness request timed out", "TimeoutError")
+        ),
+      attemptTimeout
+    )
+
     try {
-      response = await fetchResponse(`${baseUrl}/health/ready`, {
-        redirect: "error",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+      const cancelled = new Promise((_, reject) => {
+        onAbort = () => reject(requestSignal.reason)
+        if (requestSignal.aborted) onAbort()
+        else requestSignal.addEventListener("abort", onAbort, { once: true })
+      })
+      const read = (async () => {
+        const response = await fetchResponse(baseUrl + "/health/ready", {
+          redirect: "error",
+          signal: requestSignal,
+        })
+        if (response.headers.get("cache-control") !== "no-store") {
+          fail("health/ready")
+        }
+        return { status: response.status, body: await response.json() }
+      })()
+      // The deadline includes body consumption, even for an injected fetch
+      // implementation whose body does not react to cancellation.
+      const result = await Promise.race([read, cancelled])
+      assertRunning()
+      if (now() >= deadline) fail("health/ready")
+      if (now() >= attemptDeadline) {
+        throw new DOMException("Readiness request timed out", "TimeoutError")
+      }
+      if (
+        result.status === 200 &&
+        sameFields(result.body, { status: "ready" })
+      ) {
+        return
+      }
+      if (
+        result.status !== 503 ||
+        !sameFields(result.body, { status: "not_ready", code: "API_NOT_READY" })
+      ) {
+        fail("health/ready")
+      }
+    } catch (error) {
+      if (error instanceof NeonApiVerificationError) throw error
+      assertRunning()
+      if (!retryableReadinessError(error)) fail("health/ready")
+    } finally {
+      clearTimeout(timer)
+      if (onAbort) requestSignal.removeEventListener("abort", onAbort)
+      attempt.abort()
+    }
+
+    assertRunning()
+    if (now() >= deadline) break
+    try {
+      await sleep(Math.min(pollIntervalMs, deadline - now()), undefined, {
+        signal,
       })
     } catch {
+      assertRunning()
       fail("health/ready")
     }
-    const body = await responseBody(response, "health/ready")
-    if (response.status === 200 && sameFields(body, { status: "ready" })) return
-    if (
-      response.status !== 503 ||
-      !sameFields(body, { status: "not_ready", code: "API_NOT_READY" })
-    ) {
-      fail("health/ready")
-    }
-    await delay(250, undefined, { signal })
   }
+
+  assertRunning()
   fail("health/ready")
 }
 
@@ -293,6 +415,7 @@ export async function verifyNeonApi(environment, options = {}) {
     platform = process.platform,
     signals = process,
     stopTimeout = shutdownTimeout,
+    readinessOptions,
   } = options
   let staged
   let child
@@ -342,13 +465,10 @@ export async function verifyNeonApi(environment, options = {}) {
       cancellation.signal,
       fetchResponse
     )
-    await waitForReadiness(
-      baseUrl,
-      () => closed,
-      cancellation.signal,
-      fetchResponse
-    )
-    await verifyApiEndpoints(baseUrl, fetchResponse, cancellation.signal)
+    await verifyApiEndpoints(baseUrl, fetchResponse, cancellation.signal, {
+      childClosed: () => closed,
+      readinessOptions,
+    })
     if (closed) fail("unexpected-exit")
     if (platform === "win32") {
       child.send({ type: "NEON_API_STOP" }, (error) => {

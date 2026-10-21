@@ -7,6 +7,22 @@ function Assert-NeonCondition($Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Join-NeonCapturedText([object[]]$Items) {
+    # Out-String formats ErrorRecord and InformationRecord objects to the host
+    # width. Preserve each native/information message before making assertions.
+    return (($Items | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine)
+}
+
+function Test-NeonEntrypointFailure([hashtable]$Result) {
+    # The child PowerShell can itself wrap an error inside a filename. Match
+    # the exact expected diagnostic independently of whitespace introduced by
+    # either host, while retaining the nonzero-exit and no-startup checks.
+    $compactOutput = $Result.Output -replace '\s+', ''
+    return ($Result.ExitCode -ne 0 -and
+        $compactOutput.Contains('MissingNeontestconfiguration:.env.neon.test.runtime.local') -and
+        $compactOutput -notmatch 'Join-Path|emptystring|Nodelookup')
+}
+
 $fixtureDirectory = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) ('nthawi-neon-runner-' + [Guid]::NewGuid().ToString('N'))))
 $null = [IO.Directory]::CreateDirectory($fixtureDirectory)
 $runtimePath = Join-Path $fixtureDirectory '.env.neon.test.runtime.local'
@@ -35,6 +51,18 @@ $sentinels = @('PGPASSWORD', 'PGSERVICEFILE', 'PGOPTIONS', 'PGHOSTADDR', 'DATABA
 $original = @{}
 foreach ($name in (@($expected.Keys) + $sentinels)) { $original[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
+    foreach ($captureCase in @(
+        @{ ExitCode = 1; Output = 'Missing Neon test configuration: .env.neon.test.runtime.local'; Expected = $true }
+        @{ ExitCode = 1; Output = "Missing Neon test configuration:`r`n.env.neon.test.runti`r`n   me.local"; Expected = $true }
+        @{ ExitCode = 0; Output = 'Missing Neon test configuration: .env.neon.test.runtime.local'; Expected = $false }
+        @{ ExitCode = 1; Output = 'Missing Neon test configuration: .env.neon.test.operator.local'; Expected = $false }
+        @{ ExitCode = 1; Output = "Missing Neon test configuration: .env.neon.test.runtime.local`nJoin-Path failed"; Expected = $false }
+        @{ ExitCode = 1; Output = "Missing Neon test configuration: .env.neon.test.runtime.local`nempty string"; Expected = $false }
+        @{ ExitCode = 1; Output = "Missing Neon test configuration: .env.neon.test.runtime.local`nNode lookup"; Expected = $false }
+    )) {
+        Assert-NeonCondition ((Test-NeonEntrypointFailure $captureCase) -eq $captureCase.Expected) 'Entrypoint diagnostic matching depended on console width or accepted an unsafe result.'
+    }
+
     # Windows PowerShell evaluates -File parameter defaults before PSScriptRoot
     # is available. Exercise that real entrypoint in an empty synthetic root.
     $null = [IO.Directory]::CreateDirectory($entrypointScripts)
@@ -44,9 +72,9 @@ try {
         $PSNativeCommandUseErrorActionPreference = $false
         $output = @(& (Get-Process -Id $PID).Path -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entrypointPath -Target test -Mode check-config 2>&1)
         $exitCode = $LASTEXITCODE
-        @{ Output = ($output | Out-String); ExitCode = $exitCode }
+        @{ Output = (Join-NeonCapturedText $output); ExitCode = $exitCode }
     }
-    Assert-NeonCondition ($entrypointResult.ExitCode -ne 0 -and $entrypointResult.Output -match 'Missing Neon test configuration: .env.neon.test.runtime.local' -and $entrypointResult.Output -notmatch 'Join-Path|empty string|Node lookup') 'The -File entrypoint did not resolve its own configuration directory safely.'
+    Assert-NeonCondition (Test-NeonEntrypointFailure $entrypointResult) ('The -File entrypoint did not resolve its own configuration directory safely (exit code ' + $entrypointResult.ExitCode + ').')
     $global:LASTEXITCODE = 0
 
     [IO.File]::WriteAllText($runtimePath, $runtimeText, $encoding)
@@ -78,8 +106,9 @@ try {
         } catch { $script:NativeFailure = $_.Exception }
     } 6>&1)
     $failure = $script:NativeFailure
-    Assert-NeonCondition ($null -ne $failure -and $failure.Message -match 'Migration failed with exit code 7' -and (($nativeOutput | Out-String) + $failure.Message) -notmatch 'do-not-print-native-') 'Native failure handling was incorrect or disclosed raw output.'
-    Assert-NeonCondition (($nativeOutput | Out-String) -match 'code=NEON_ACCEPTANCE_FAILED stage=role:auth postgres_code=28P01 network_code=none') 'Native failure handling discarded safe diagnostics.'
+    $nativeText = Join-NeonCapturedText $nativeOutput
+    Assert-NeonCondition ($null -ne $failure -and $failure.Message -match 'Migration failed with exit code 7' -and ($nativeText + $failure.Message) -notmatch 'do-not-print-native-') 'Native failure handling was incorrect or disclosed raw output.'
+    Assert-NeonCondition ($nativeText -match 'code=NEON_ACCEPTANCE_FAILED stage=role:auth postgres_code=28P01 network_code=none') 'Native failure handling discarded safe diagnostics.'
     $global:LASTEXITCODE = 0
 
     function Invoke-NeonNative {

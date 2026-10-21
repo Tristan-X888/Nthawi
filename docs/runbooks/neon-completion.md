@@ -3,9 +3,10 @@
 The local baseline gate passed. PR [#4](https://github.com/Tristan-X888/Nthawi/pull/4)
 still needs external review and successful GitHub checks for its final published
 head before baseline closure. Isolated Neon migrations, runtime grants, and
-live database and compiled API acceptance passed. Production remains empty and
-untouched. The Neon gate remains open until isolated acceptance and reviewed
-production promotion are complete. Render follows that gate.
+live database and compiled API acceptance passed. Production was last inspected
+read-only and empty; no production writes were performed. The Neon gate remains
+open until baseline review and reviewed production promotion are complete.
+Render follows that gate.
 
 ## 1. Reproduce the repository baseline
 
@@ -30,7 +31,7 @@ and builds and tests the Linux API image. It restores process configuration and
 removes its owned containers and temporary resources. It does not migrate or
 delete the development database.
 
-Recorded local evidence:
+Recorded local evidence after the 21 October verifier repair:
 
 | Check                                                       | Result             |
 | ----------------------------------------------------------- | ------------------ |
@@ -41,13 +42,26 @@ Recorded local evidence:
 | Database / API integration tests                            | 65 / 30 passed     |
 | Docker API image startup, runtime, health and shutdown      | Passed             |
 | Neon target and database verifier regressions               | 74 passed          |
-| Compiled Neon API verifier regressions                      | 12 passed          |
+| Compiled Neon API verifier regressions                      | 23 passed          |
 | PowerShell Neon runner lifecycle cases                      | 9 passed           |
 | Baseline lockfile / runner lifecycle cases                  | 3 / 6 passed       |
 
 The production audit has one moderate esbuild development-server advisory and no
 high or critical findings. The configured high-severity audit gate passes; the
 advisory still needs a separately reviewed dependency update.
+
+Vite is locked to `8.3.3` across the API, widget and Vitest peer contexts. This
+supported patch addresses the Windows launch-editor advisories, including
+[GHSA-587h-7wmj-h5pm](https://github.com/vitejs/launch-editor/security/advisories/GHSA-587h-7wmj-h5pm).
+No audit suppression or incompatible transitive override is used.
+
+Vitest and its matching coverage/mocker packages are locked to `4.1.12`, the
+supported patch for the newly reported
+[manual mock registration](https://github.com/vitest-dev/vitest/security/advisories/GHSA-qxg6-89mg-rqv8)
+and
+[Windows redirect traversal](https://github.com/vitest-dev/vitest/security/advisories/GHSA-xp26-3454-mjgp)
+advisories. The lockfile includes the compatible transitive dependency resolution
+produced by pnpm; a frozen install must still leave its bytes unchanged.
 
 Readiness now reads its 13 catalog datasets in a single read-only SQL batch.
 The three-second probe and four-second HTTP deadlines remain unchanged. The
@@ -75,6 +89,50 @@ if ($LASTEXITCODE -ne 0) { throw 'Baseline runner lifecycle cases failed.' }
 ```
 
 The build must precede tests that execute the compiled production entry point.
+
+### Recover verifier editing and terminal-formatting failures
+
+Keep the compiled API readiness regressions in
+`scripts/verify-neon-api.test.mjs`. They use the API harness and endpoint helpers
+defined in that file; placing them in `verify-neon-database.test.mjs` causes
+undefined-helper errors before live acceptance runs. The database verifier suite
+and the API verifier suite remain separate and both run in CI.
+
+After editing the verifier or its tests, format those exact files before running
+the complete gate:
+
+```powershell
+pnpm.cmd exec prettier --write scripts/verify-neon-api.mjs scripts/verify-neon-api.test.mjs
+if ($LASTEXITCODE -ne 0) { throw 'Verifier formatting failed.' }
+```
+
+Readiness acceptance uses one bounded poller. Exact, non-cacheable 503 responses
+and recognized transport failures can recover within the 45-second readiness
+window. Only an exact, non-cacheable 200 ready response satisfies acceptance.
+Malformed responses, persistent unavailability, interruption and child exit
+still fail; the API's database and HTTP readiness deadlines are unchanged.
+Each request deadline also covers reading its JSON body.
+
+Listener startup has a separate limit: 90 seconds on Windows and 45 seconds on
+Linux. The API composition E2E setup hook uses the same finite allowance. A
+controlled Windows trace measured 55 seconds to liveness while loading modules,
+followed by successful shutdown. The
+longer Windows startup allowance does not extend the 45-second readiness window;
+a regression rejects readiness budgets above that limit before any request.
+
+The standalone database verifier retains its four single-connection pools until
+its mandatory cleanup. Disabling idle eviction only in these temporary pools
+keeps verified connections available while the other roles are checked. A fresh
+verified login can exceed three seconds; it must not be introduced by an idle
+timer immediately before the unchanged three-second capability probe. Socket
+failures, invalid permissions and incompatible schemas still fail acceptance.
+
+The PowerShell lifecycle tests capture message text directly instead of passing
+error/information records through `Out-String`. Their entrypoint assertions
+recognize the exact expected missing-file diagnostic across terminal wrapping,
+while still requiring a nonzero exit and rejecting premature subprocess startup.
+The suite includes seven diagnostic cases and runs in both piped output and a
+normal narrow terminal.
 
 ## 2. Verify the isolated Neon branch
 
@@ -192,7 +250,7 @@ when the foreground API stops:
 & {
     $ErrorActionPreference = 'Stop'
     $operatorVariables = @(Get-ChildItem Env: | Where-Object {
-        $_.Name -match '^(?:DATABASE_MIGRATION_URL|JOBS_DATABASE_URL|DATABASE_.*_ROLE|DATABASE_.*_PASSWORD|AUTH_TEST_ADMIN_URL|RLS_TEST_ADMIN_URL|NEON.*|PG.*|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|NODE_TLS_REJECT_UNAUTHORIZED)$'
+        $_.Name -match '^(?:DATABASE_MIGRATION_URL|JOBS_DATABASE_URL|DATABASE_.*_ROLE|DATABASE_.*_PASSWORD|AUTH_TEST_ADMIN_URL|RLS_TEST_ADMIN_URL|NEON.*|PG.*|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|NODE_TLS_REJECT_UNAUTHORIZED|NODE_USE_SYSTEM_CA|SSL_CERT_FILE|SSL_CERT_DIR|OPENSSL_CONF)$'
     })
     if ($operatorVariables.Count -gt 0) {
         throw 'Use a clean API shell without exported operator or connection-override variables.'

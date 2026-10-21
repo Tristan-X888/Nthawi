@@ -326,3 +326,289 @@ test("error output cannot disclose arbitrary messages, causes, or forged stages"
     )
   }
 })
+
+const { waitForReadiness } = await import("./verify-neon-api.mjs")
+
+test("readiness cannot inherit the longer Windows listener startup allowance", async () => {
+  let requests = 0
+  for (const timeoutMs of [45_001, 90_000]) {
+    await assert.rejects(
+      waitForReadiness(
+        "http://127.0.0.1:41234",
+        () => false,
+        undefined,
+        () => {
+          requests++
+          throw new Error("No request should be made")
+        },
+        { timeoutMs }
+      ),
+      { stage: "configuration" }
+    )
+  }
+  assert.equal(requests, 0)
+})
+
+function readinessClock() {
+  let milliseconds = 0
+  return {
+    advance: (value) => {
+      milliseconds += value
+    },
+    elapsed: () => milliseconds,
+    options: {
+      timeoutMs: 1000,
+      requestTimeoutMs: 1000,
+      pollIntervalMs: 200,
+      now: () => milliseconds,
+      sleep: async (duration, _value, { signal }) => {
+        assert.equal(signal?.aborted ?? false, false)
+        milliseconds += duration
+      },
+    },
+  }
+}
+
+function readyResponse(status, body) {
+  return Response.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  })
+}
+
+function temporaryConnectionError() {
+  return new TypeError("do-not-disclose-private-connection", {
+    cause: { code: "ECONNRESET" },
+  })
+}
+
+test("readiness recovers from a connection reset, timeout and exact 503", async () => {
+  const clock = readinessClock()
+  let calls = 0
+  await waitForReadiness(
+    "http://127.0.0.1:41234",
+    () => false,
+    new AbortController().signal,
+    async () => {
+      calls++
+      if (calls === 1) throw temporaryConnectionError()
+      if (calls === 2) throw new DOMException("timed out", "TimeoutError")
+      return calls === 3
+        ? readyResponse(503, { status: "not_ready", code: "API_NOT_READY" })
+        : readyResponse(200, { status: "ready" })
+    },
+    clock.options
+  )
+  assert.equal(calls, 4)
+  assert.equal(clock.elapsed(), 600)
+})
+
+test("persistent readiness unavailability exhausts one bounded deadline", async () => {
+  for (const transport of [false, true]) {
+    const clock = readinessClock()
+    let calls = 0
+    await assert.rejects(
+      waitForReadiness(
+        "http://127.0.0.1:41234",
+        () => false,
+        new AbortController().signal,
+        async () => {
+          calls++
+          if (transport) throw temporaryConnectionError()
+          return readyResponse(503, {
+            status: "not_ready",
+            code: "API_NOT_READY",
+          })
+        },
+        clock.options
+      ),
+      { stage: "health/ready" }
+    )
+    assert.equal(calls, 5)
+    assert.equal(clock.elapsed(), 1000)
+  }
+})
+
+test("readiness malformed responses and redirects fail without retry", async () => {
+  const responses_ = [
+    () => readyResponse(200, { status: "not_ready" }),
+    () =>
+      readyResponse(503, {
+        status: "not_ready",
+        code: "API_NOT_READY",
+        connection: "do-not-disclose",
+      }),
+    () => readyResponse(401, { status: "ready" }),
+    () =>
+      Response.json(
+        { status: "ready" },
+        {
+          headers: { "Cache-Control": "public" },
+        }
+      ),
+    () =>
+      new Response("do-not-disclose-invalid-json", {
+        headers: { "Cache-Control": "no-store" },
+      }),
+    () => {
+      throw new TypeError("fetch failed", {
+        cause: new Error("unexpected redirect"),
+      })
+    },
+    () => {
+      throw new TypeError("invalid request configuration")
+    },
+  ]
+  for (const makeResponse of responses_) {
+    const clock = readinessClock()
+    let calls = 0
+    await assert.rejects(
+      waitForReadiness(
+        "http://127.0.0.1:41234",
+        () => false,
+        new AbortController().signal,
+        async () => {
+          calls++
+          return makeResponse()
+        },
+        clock.options
+      ),
+      { stage: "health/ready" }
+    )
+    assert.equal(calls, 1)
+    assert.equal(clock.elapsed(), 0)
+  }
+})
+
+test("readiness rejects a response arriving after its overall deadline", async () => {
+  const clock = readinessClock()
+  await assert.rejects(
+    waitForReadiness(
+      "http://127.0.0.1:41234",
+      () => false,
+      new AbortController().signal,
+      async () => {
+        clock.advance(1001)
+        return readyResponse(200, { status: "ready" })
+      },
+      clock.options
+    ),
+    { stage: "health/ready" }
+  )
+})
+
+test("readiness cancellation and child exit stop polling immediately", async () => {
+  for (const interruption of [true, false]) {
+    const clock = readinessClock()
+    const controller = new AbortController()
+    let closed = false
+    let calls = 0
+    await assert.rejects(
+      waitForReadiness(
+        "http://127.0.0.1:41234",
+        () => closed,
+        controller.signal,
+        async () => {
+          calls++
+          if (interruption) controller.abort()
+          else closed = true
+          return readyResponse(200, { status: "ready" })
+        },
+        clock.options
+      ),
+      { stage: interruption ? "interrupted" : "unexpected-exit" }
+    )
+    assert.equal(calls, 1)
+    assert.equal(clock.elapsed(), 0)
+  }
+})
+
+test("readiness bounds a body reader that ignores request cancellation", async () => {
+  let calls = 0
+  await waitForReadiness(
+    "http://127.0.0.1:41234",
+    () => false,
+    new AbortController().signal,
+    async () => {
+      calls++
+      if (calls === 1)
+        return {
+          status: 200,
+          headers: new Headers({ "Cache-Control": "no-store" }),
+          json: () => new Promise(() => {}),
+        }
+      return readyResponse(200, { status: "ready" })
+    },
+    { timeoutMs: 2000, requestTimeoutMs: 25, pollIntervalMs: 1 }
+  )
+  assert.equal(calls, 2)
+})
+
+test("readiness bounds a fetch implementation that ignores cancellation", async () => {
+  let calls = 0
+  await waitForReadiness(
+    "http://127.0.0.1:41234",
+    () => false,
+    new AbortController().signal,
+    async () => {
+      calls++
+      if (calls === 1) return new Promise(() => {})
+      return readyResponse(200, { status: "ready" })
+    },
+    { timeoutMs: 2000, requestTimeoutMs: 25, pollIntervalMs: 1 }
+  )
+  assert.equal(calls, 2)
+})
+
+test("compiled acceptance does not perform a second un-retried readiness check", async () => {
+  const fixture = harness()
+  let readyCalls = 0
+  fixture.options.fetchResponse = (url, options) => {
+    if (url.endsWith("/health/ready") && ++readyCalls > 1) {
+      return readyResponse(503, { status: "not_ready", code: "API_NOT_READY" })
+    }
+    return responses(url, options)
+  }
+  assert.deepEqual(await verifyNeonApi(environment(), fixture.options), {
+    shutdownMode: "os-sigterm",
+  })
+  assert.equal(readyCalls, 1)
+})
+
+test("endpoint acceptance uses the bounded readiness poller", async () => {
+  const clock = readinessClock()
+  let readyCalls = 0
+  await verifyApiEndpoints(
+    "http://127.0.0.1:41234",
+    (url, options) => {
+      if (url.endsWith("/health/ready")) {
+        readyCalls++
+        if (readyCalls === 1) {
+          return readyResponse(503, {
+            status: "not_ready",
+            code: "API_NOT_READY",
+          })
+        }
+      }
+      return responses(url, options)
+    },
+    new AbortController().signal,
+    { readinessOptions: clock.options }
+  )
+  assert.equal(readyCalls, 2)
+})
+
+test("persistent readiness failure kills the child and cleans staged files", async () => {
+  const fixture = harness()
+  const clock = readinessClock()
+  fixture.options.readinessOptions = clock.options
+  fixture.options.fetchResponse = (url, options) =>
+    url.endsWith("/health/ready")
+      ? readyResponse(503, { status: "not_ready", code: "API_NOT_READY" })
+      : responses(url, options)
+  await assert.rejects(verifyNeonApi(environment(), fixture.options), {
+    stage: "health/ready",
+  })
+  assert.deepEqual(fixture.calls.slice(-2), ["SIGKILL", "cleanup"])
+  assert.equal(fixture.signals.eventNames().length, 0)
+})

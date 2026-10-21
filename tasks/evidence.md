@@ -111,3 +111,125 @@ roles, no application schemas/tables and no vector extension. Production bootstr
 migrations and grants have not run. The prepared promotion sequence is in the
 completion runbook; the test runner intentionally refuses production execution.
 Render and subsequent delivery gates have not started.
+
+## Verifier recovery — 21–22 October 2026
+
+The pasted failure had three separate causes: API-only tests had been appended
+to the database test file, edited files had not been formatted, and PowerShell
+diagnostic assertions depended on terminal-width formatting. The API tests now
+live beside their harness, and diagnostic tests capture message text directly.
+Seven deterministic diagnostic cases include wrapping inside the missing filename
+and rejection of unrelated startup failures.
+
+The readiness verifier now uses one bounded poller instead of a successful poll
+followed by a second un-retried check. It retries recognized transport failures
+and the exact non-cacheable 503 contract, requires the exact 200 ready contract,
+and bounds both fetch and body consumption. Its readiness window stays at 45s.
+Malformed responses, interruption, child exit and persistent unavailability fail.
+
+A controlled Windows trace reached liveness at 54.990s while loading modules and
+then shut down successfully. Windows listener startup now permits 90s; Linux
+retains 45s. This allowance does not extend readiness: a regression rejects
+readiness budgets over 45s before issuing a request. The database verifier also
+retains its four owned single-connection pools until mandatory final cleanup,
+preventing idle eviction from introducing another TLS login immediately before
+the unchanged three-second capability probe.
+
+The first full baseline attempt stopped at the production audit because Vite
+8.3.1/8.3.2 had newly reported launch-editor advisories. API and widget dependency
+requirements and the lockfile now resolve Vite 8.3.3, including Vitest peer
+contexts. The supported patch removes those high-severity findings without audit
+suppression or an incompatible override. The subsequent full baseline passed
+frozen dependency integrity, formatting, lint, types, builds, all 52 API / 35
+tooling / 6 database unit tests, 34 boundary / 7 image helper / 4 compiled export
+tests, 3 API composition tests, 65 database / 30 API integration tests, production
+audit and actual Linux image verification. One moderate esbuild advisory remains;
+the high/critical gate passes.
+
+Focused Neon regressions passed **97/97** (74 target/database and 23 compiled API
+verifier tests). The PowerShell runner passed its nine lifecycle cases and seven
+diagnostic cases, including a narrow terminal run. Live `-Target test -Mode verify`
+passed role/schema/vector/migration checks and actual compiled API acceptance
+with `shutdown_mode=ipc-sigterm-hook`. The Linux image also passed live acceptance
+with `shutdown_mode=os-sigterm`. The accepted image was:
+
+```text
+nthawi-api:step4
+sha256:05117fa29d57f40dd46ffce37f150455cdfeb26d43ae6663687736f21ca0f112
+```
+
+Raw logs retained in the operator's temporary directory:
+
+- `nthawi-baseline-patched-2026-10-21.log`
+- `nthawi-neon-regressions-final-2026-10-21.log`
+- `nthawi-runner-regressions-2026-10-21.log`
+- `nthawi-neon-live-final-2026-10-21.log`
+- `nthawi-neon-linux-2026-10-21.log`
+- `nthawi-api-startup-profile-2026-10-21.log`
+- `nthawi-coderabbit-final-2026-10-21.ndjson`
+
+Authenticated CodeRabbit review completed over all nine changed code/dependency/
+runbook files and raised **0 issues**. A further independent read-only review on
+22 October (Africa/Blantyre, UTC+02:00) found no material issues. A final CodeRabbit
+documentation review raised one minor date concern; a UTC clock check confirmed
+the local review date, which is now explicit. Failed early startup/audit attempts are not
+counted as passes. Publishing the tested revision and validating its hosted
+checks is separate from these local results; independent GitHub approval,
+baseline merge and reviewed production promotion remain open requirements.
+
+A fresh 22 October baseline rerun exposed a first-composition E2E setup hook
+exceeding Vitest's default 10s (10.104s, with the next two cases passing). The host
+had less than 1 GiB free memory. This setup uses lazy database pools and synthetic
+auth without contacting Neon. Cold local composition is consistent with the
+earlier module-loading trace; timing alone does not establish its sole cause.
+Only this setup hook now has a finite 90s Windows / 45s Linux startup allowance,
+matching the compiled verifier. Test bodies, cleanup and readiness deadlines are
+unchanged. That failed rerun is not counted as a passing baseline.
+
+The subsequent 22 October baseline completed with exit 0, including 3/3 API
+composition tests, 65/65 database and 30/30 API integration tests, image checks
+and scoped cleanup. Its audit had no high/critical findings but reported five
+moderate findings: the existing esbuild advisory plus two new Vitest mocker
+advisories across peer contexts. A supported Vitest/coverage patch to `4.1.12`
+replaced every affected `4.1.11` context; Vite remains `8.3.3`. The resolver also
+updated compatible Babel and source-map codec edges. These dependency changes
+require another complete baseline run before publication.
+
+### Final patched acceptance (22 October, Africa/Blantyre)
+
+The complete baseline on Vite `8.3.3` and Vitest/coverage `4.1.12` exited **0**.
+All checks and counts above passed, including fresh production builds, 3 API
+composition tests, 65 database and 30 API integration tests, actual image checks
+and owned-resource cleanup. The frozen install preserved this lockfile SHA-256:
+
+```text
+fe27cb49294a8e9967c6142f98fecf0e81801b5e635ec6bb5a390736c2468842
+```
+
+The final audit JSON reports **1 moderate, 0 high, 0 critical**; only the existing
+esbuild advisory remains. Both new Vitest advisories are resolved.
+
+Live isolated `-Target test -Mode verify` then exited **0**, with 74/74 database/
+target and 23/23 API verifier regressions, all four role confirmations, application
+readiness and compiled Windows acceptance (`shutdown_mode=ipc-sigterm-hook`).
+The final Linux image also exited **0** with real OS SIGTERM acceptance:
+
+```text
+sha256:f0fd1da6cb0d1342426719d032e723b59bd2d552f8627fdc21b85636f2162e28
+NEON_API_ACCEPTANCE_PASSED shutdown_mode=os-sigterm
+NEON_LINUX_OWNED_CONTAINER_REMOVED
+```
+
+Final PowerShell reruns passed both piped and narrow-terminal capture (nine
+lifecycle and seven diagnostic cases), three lockfile cases and six baseline
+orchestration cases plus native-exit handling. Authenticated CodeRabbit reviewed
+all 11 changed files after the Vitest patch and raised **0 issues**. Independent
+review confirmed that all compatible transitive refreshes satisfy their parent
+dependency ranges. No production writes were performed.
+
+The final baseline and Windows acceptance raw logs are
+`nthawi-baseline-vitest-final-2026-10-22.log` and
+`nthawi-neon-live-final-2026-10-22.log` in the operator's temporary directory.
+The audit snapshot is `nthawi-audit-patched-2026-10-22.json`. Published-head CI
+and the required independent GitHub approval remain separate external evidence;
+production promotion and Render remain pending.

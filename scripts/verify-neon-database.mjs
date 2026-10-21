@@ -378,6 +378,10 @@ export async function verifyNeonDatabase(environment, mode, dependencies) {
       const pool = new Pool({
         ...neonTestConnectionOptions(environment, profile.variable),
         max: 1,
+        // Retain verified connections across sequential role checks. The
+        // short-lived verifier owns all four pools and closes them in finally;
+        // idle eviction must not force TLS/login into the 3s catalog probe.
+        idleTimeoutMillis: 0,
         connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
         query_timeout: QUERY_TIMEOUT_MS,
         statement_timeout: STATEMENT_TIMEOUT_MS,
