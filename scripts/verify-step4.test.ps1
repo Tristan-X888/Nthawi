@@ -63,6 +63,10 @@ function Test-Lifecycle([bool]$FailGate, [bool]$FailCleanup, [string]$NodeVersio
             Assert-GateCondition ($starts.Count -eq 0 -and $cleanups.Count -eq 0) 'Version rejection started or removed database resources'
         } else {
             Assert-GateCondition ($starts.Count -eq 1 -and $cleanups.Count -eq 1) 'Database lifecycle did not finish exactly once'
+            $lockfileTests = @($script:Calls | Where-Object { $_.Arguments -contains 'scripts/verify-step4-lockfile.test.ps1' })
+            Assert-GateCondition ($lockfileTests.Count -eq 1) 'Lockfile regression gate did not run exactly once'
+            $install = @($script:Calls | Where-Object { $_.Arguments -contains 'install' })
+            Assert-GateCondition ($install.Count -eq 1 -and $script:Calls.IndexOf($lockfileTests[0]) -lt $script:Calls.IndexOf($install[0])) 'Lockfile regression gate must precede the frozen installation'
             $startArgs = $starts[0].Arguments
             $cleanupArgs = $cleanups[0].Arguments
             Assert-GateCondition ($startArgs[2] -match '^nthawi-step4-[a-f0-9]{32}$') 'Database project was not isolated'
