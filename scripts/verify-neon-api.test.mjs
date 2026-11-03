@@ -546,6 +546,14 @@ test("readiness bounds a body reader that ignores request cancellation", async (
 
 test("readiness bounds a fetch implementation that ignores cancellation", async () => {
   let calls = 0
+  // This case measures cancellation of a hung fetch. Keep the successful
+  // response in memory so cold Response/stream setup cannot consume its 25ms
+  // budget and introduce an unrelated extra retry under local load.
+  const ready = {
+    status: 200,
+    headers: { get: () => "no-store" },
+    json: async () => ({ status: "ready" }),
+  }
   await waitForReadiness(
     "http://127.0.0.1:41234",
     () => false,
@@ -553,7 +561,7 @@ test("readiness bounds a fetch implementation that ignores cancellation", async 
     async () => {
       calls++
       if (calls === 1) return new Promise(() => {})
-      return readyResponse(200, { status: "ready" })
+      return ready
     },
     { timeoutMs: 2000, requestTimeoutMs: 25, pollIntervalMs: 1 }
   )

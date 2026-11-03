@@ -1,5 +1,10 @@
 # Neon prototype database
 
+> Historical Neon setup reference. Both registered branches were confirmed
+> archived on 3 November 2026. Follow the [Phase 1 baseline](../../docs/runbooks/phase-1-baseline.md)
+> for current acceptance; do not run bootstrap, migrations, password changes or
+> branch lifecycle operations as part of that phase.
+
 Use the [completion runbook](../../docs/runbooks/neon-completion.md) for baseline
 evidence, API startup, PR review, and production promotion. The Neon gate remains
 open until reviewed production promotion is complete. Passing isolated acceptance

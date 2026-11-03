@@ -1,6 +1,9 @@
-# shadcn/ui monorepo template
+# Nthawi
 
-This is a Next.js monorepo template with shadcn/ui.
+The Phase 1 foundation is a pnpm workspace with a Nest/Fastify API, PostgreSQL,
+and web/widget starters. The [authoritative baseline runbook](docs/runbooks/phase-1-baseline.md)
+records the accepted checkout, current gates, verification commands, and the
+boundary between historical evidence and current acceptance.
 
 ## Installing dependencies
 

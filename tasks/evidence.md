@@ -1,5 +1,9 @@
 # Baseline and isolated Neon evidence — 17 October 2026
 
+> Historical evidence is retained below. Current Phase 1 evidence is in
+> [the 3 November baseline record](../docs/runbooks/phase-1-baseline.md).
+> Earlier successful runs do not establish a current pass.
+
 Use `docs/runbooks/neon-completion.md` for commands and the remaining delivery order.
 This record does not mark reviewed production promotion or GitHub approval complete.
 

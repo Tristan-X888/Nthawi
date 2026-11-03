@@ -110,4 +110,4 @@ jobs:
             --project-name "$TEST_COMPOSE_PROJECT" \
             --env-file /dev/null \
             --file infra/compose.test.yml \
-            down --volumes --remove-orphans --timeout 10
+            down --remove-orphans --timeout 10

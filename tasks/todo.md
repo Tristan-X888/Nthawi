@@ -1,5 +1,11 @@
 # Baseline and Neon acceptance checklist
 
+> Historical checklist. Checked items below describe October evidence and are
+> not fresh passes. Current Phase 1 criteria and remaining gates are recorded in
+> [the authoritative baseline](../docs/runbooks/phase-1-baseline.md). Production
+> promotion is outside Phase 1; merging requires an explicit user instruction
+> and all repository gates, including independent approval.
+
 - [x] Restore verifier configuration, branch, role, TLS, cleanup, and diagnostic contracts; run focused Node and PowerShell regressions.
 - [x] Include lockfile regression and API end-to-end tests in the complete gate; verify orchestration.
 - [x] Run frozen dependency install with unchanged lockfile, formatting, lint, types, unit tests, builds, integration, boundaries, compiled exports, production audit, and Docker image checks.

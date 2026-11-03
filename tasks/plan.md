@@ -1,5 +1,10 @@
 # Baseline recovery and Neon completion
 
+> Historical 17 October plan, retained as reference. The chat instructions and
+> 30 October 2026 production plan govern the current Phase 1 sequence. See
+> [the authoritative baseline](../docs/runbooks/phase-1-baseline.md). Production
+> promotion, Neon lifecycle changes and infrastructure are outside this phase.
+
 Requested 2026-10-17. Scope follows delivery gates 1 and 2; deployment and frontend work wait for their completion.
 
 ## Decisions

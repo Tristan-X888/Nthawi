@@ -1,5 +1,9 @@
 # Nthawi implementation reconciliation and verification gates
 
+> Historical 8 October reference. Its ordering, purchase assumptions and quotas
+> are superseded by the current chat and 30 October production plan. Use the
+> [Phase 1 baseline](../../runbooks/phase-1-baseline.md) for current scope and gates.
+
 Date: 8 October 2026.
 
 This document reconciles the supplied **Nthawi Production Build Implementation

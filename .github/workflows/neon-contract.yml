@@ -59,7 +59,7 @@ jobs:
         run: pnpm exec turbo run build --filter=@nthawi/api
 
       - name: Verify compiled API acceptance lifecycle without Neon credentials
-        run: node --test scripts/verify-neon-api.test.mjs
+        run: node --test scripts/verify-neon-api.test.mjs scripts/verify-local-api.test.mjs
 
       - name: Verify migration entry point syntax
         run: |

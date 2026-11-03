@@ -381,7 +381,6 @@ function Invoke-Step4Verification {
                     'docker' `
                     ($composeArguments + @(
                         'down',
-                        '--volumes',
                         '--remove-orphans',
                         '--timeout',
                         '10'

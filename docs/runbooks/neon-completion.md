@@ -1,5 +1,11 @@
 # Repository recovery and Neon completion
 
+> Historical October execution record. For current checkout selection, Phase 1
+> scope and acceptance, use [the authoritative baseline](phase-1-baseline.md).
+> Both known Neon branches were confirmed archived on 3 November 2026. The live
+> commands below require separate authorization and suitable branch state; they
+> are not Phase 1 instructions or evidence of a fresh pass.
+
 The local baseline gate passed. PR [#4](https://github.com/Tristan-X888/Nthawi/pull/4)
 still needs external review and successful GitHub checks for its final published
 head before baseline closure. Isolated Neon migrations, runtime grants, and

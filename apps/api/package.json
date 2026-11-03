@@ -26,7 +26,7 @@
     "test:integration": "vitest run --config ./vitest.config.integration.ts"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "1.7.6",
+    "@better-auth/drizzle-adapter": "1.7.7",
     "@fastify/cors": "^11.3.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
@@ -35,16 +35,16 @@
     "@nestjs/platform-fastify": "^12.1.0",
     "@nthawi/contracts": "workspace:*",
     "@nthawi/db": "workspace:*",
-    "better-auth": "1.7.6",
+    "better-auth": "1.7.7",
     "drizzle-orm": "0.45.3",
     "fastify": "^5.12.5",
     "pg-boss": "12.35.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "zod": "4.6.5",
+    "zod": "4.6.6",
     "@nthawi/tooling": "workspace:*",
     "@better-auth/infra": "0.4.12",
-    "@better-auth/core": "1.7.6",
+    "@better-auth/core": "1.7.7",
     "@better-auth/utils": "0.4.2"
   },
   "devDependencies": {

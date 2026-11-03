@@ -37,6 +37,11 @@ export function createNeonApiEnvironment(environment, port) {
   } catch {
     fail("configuration")
   }
+  return createCompiledApiEnvironment(environment, port)
+}
+
+/** Pass only runtime logins and synthetic provider configuration to the child. */
+export function createCompiledApiEnvironment(environment, port) {
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     fail("configuration")
   }
@@ -404,9 +409,18 @@ async function waitForExit(exit, milliseconds) {
 
 /** Dependencies are injectable for safe, network-free failure-path tests. */
 export async function verifyNeonApi(environment, options = {}) {
+  return verifyCompiledApi(environment, createNeonApiEnvironment, options)
+}
+
+/** Share lifecycle mechanics while each entry point owns target validation. */
+export async function verifyCompiledApi(
+  environment,
+  createEnvironment,
+  options = {}
+) {
   // Reject production and malformed test credentials before creating files,
   // selecting a port, importing compiled code, or spawning a process.
-  createNeonApiEnvironment(environment, 4000)
+  createEnvironment(environment, 4000)
   const {
     prepare = prepareCompiledApi,
     selectPort = availablePort,
@@ -434,7 +448,7 @@ export async function verifyNeonApi(environment, options = {}) {
   signals.on("SIGTERM", interrupt)
   try {
     const port = await selectPort()
-    const childEnvironment = createNeonApiEnvironment(environment, port)
+    const childEnvironment = createEnvironment(environment, port)
     staged = await prepare()
     if (interrupted) fail("interrupted")
     child = spawnProcess(process.execPath, staged.args, {

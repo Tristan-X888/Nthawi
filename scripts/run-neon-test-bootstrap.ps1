@@ -170,7 +170,7 @@ try {
     # --------------------------------------------------
 
     foreach ($name in $secretNames) {
-        Write-Host "`nEnter the existing password for $name" `
+        Write-Host "`nEnter the password to assign to new role $name" `
             -ForegroundColor Yellow
 
         $secureValue = Read-Host `
