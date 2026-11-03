@@ -1,10 +1,25 @@
 # Phase 1: authoritative baseline
 
-Status on **3 November 2026 (Africa/Blantyre)**: **local baseline verified**;
-PR [#4](https://github.com/Tristan-X888/Nthawi/pull/4) remains unmerged.
-Phase 1 remains open until the final published revision passes current hosted
-checks, receives an independent approving review, and is merged after the user's
-explicit merge instruction. Automated reviews do not satisfy that approval.
+Status on **3 November 2026 (Africa/Blantyre)**: **Phase 1 closed** at accepted
+merge commit `0dd234d2af9663f05d5c1ed69e6fd7f4668e3efe` on `master`.
+PR [#4](https://github.com/Tristan-X888/Nthawi/pull/4) merged the reviewed candidate
+`6b1d27aba264e0cfdf0db311cc43247d01add319` after
+[sviyazhi's independent approval](https://github.com/Tristan-X888/Nthawi/pull/4#pullrequestreview-5753135022).
+The current user supplied that accepted merge and authorized Step 2.1 only.
+
+Before Step 2.1 editing, new accepted-merge attempts passed:
+[Verify repository, attempt 2](https://github.com/Tristan-X888/Nthawi/actions/runs/41647168517/attempts/2)
+and [Verify Neon contracts, attempt 2](https://github.com/Tristan-X888/Nthawi/actions/runs/41647168748/attempts/2).
+The checkout was clean; current effective protections and zero PR review threads
+were refreshed. The feature branch remains preserved. See the
+[Step 2.1 procedure/evidence](../plans/2026-11-03-phase-2-step-2.1.md) and
+[release specification v0.1](../release/v0.1/specification.md).
+
+The remaining sections preserve the **pre-merge Phase 1 execution record**.
+Their statements about missing approval or an unmerged PR describe the earlier
+checkpoint and are superseded by this dated closure; they are not current
+blockers. Historical execution results are not fresh Step 2.1 verification.
+No later work or merge is authorized by this closure record.
 
 ## Authority and scope
 
