@@ -1,5 +1,10 @@
 # Step 4 API/database foundation
 
+> Historical implementation and evidence. Current authority, checkout and
+> remaining review/merge gates are in the
+> [Phase 1 baseline](../../runbooks/phase-1-baseline.md). Earlier acceptance does
+> not establish a current pass or authorize later delivery phases.
+
 The user authorized implementation of the complete Step 4 outline on 10 October 2026. Preserve the Nest/Fastify monolith, current Better Auth behavior, existing
 Drizzle migrations, root `Hello World!` endpoint, and all unrelated user work.
 This does not authorize commits, pushes, deployment, real provider calls, or

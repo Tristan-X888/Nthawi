@@ -62,6 +62,13 @@ jobs:
         shell: pwsh
         run: ./scripts/verify-step4.test.ps1
 
+      - name: Verify frozen lockfile regression cases
+        shell: pwsh
+        run: ./scripts/verify-step4-lockfile.test.ps1
+
+      - name: Verify API composition and lifecycle
+        run: pnpm --filter @nthawi/api test:e2e
+
       - name: Verify migration definitions and compiled schema contract
         run: |
           pnpm --filter @nthawi/db db:check
@@ -103,4 +110,4 @@ jobs:
             --project-name "$TEST_COMPOSE_PROJECT" \
             --env-file /dev/null \
             --file infra/compose.test.yml \
-            down --volumes --remove-orphans --timeout 10
+            down --remove-orphans --timeout 10

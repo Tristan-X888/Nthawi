@@ -1,0 +1,176 @@
+\set ON_ERROR_STOP on
+\set ECHO none
+\set ECHO_HIDDEN off
+
+-- Neon terminates client TLS at its proxy. Enforce certificate verification
+-- in psql instead of inspecting the proxy-to-Postgres link in pg_stat_ssl.
+-- Supply sslrootcert in the initial connection; it is preserved here.
+\connect -reuse-previous=on sslmode=verify-full
+
+-- Inject these secrets into the psql process, never through command-line -v.
+-- Neon requires plaintext password input; \password sends unsupported hashes.
+\set migrator_password ''
+\set auth_password ''
+\set business_password ''
+\set jobs_password ''
+\getenv migrator_password DATABASE_MIGRATOR_PASSWORD
+\getenv auth_password DATABASE_AUTH_PASSWORD
+\getenv business_password DATABASE_BUSINESS_PASSWORD
+\getenv jobs_password DATABASE_JOBS_PASSWORD
+
+SELECT :'migrator_password' <> ''
+   AND :'auth_password' <> ''
+   AND :'business_password' <> ''
+   AND :'jobs_password' <> '' AS passwords_supplied \gset
+
+\if :passwords_supplied
+\else
+DO $passwords$
+BEGIN
+  RAISE EXCEPTION 'Set all DATABASE_{MIGRATOR,AUTH,BUSINESS,JOBS}_PASSWORD environment variables';
+END
+$passwords$;
+\endif
+
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+SET LOCAL password_encryption = 'scram-sha-256';
+
+DO $preflight$
+BEGIN
+  IF current_database() <> 'neondb'
+     OR current_user <> 'neondb_owner'
+     OR current_user <> session_user THEN
+    RAISE EXCEPTION 'Unexpected bootstrap identity or database';
+  END IF;
+
+  IF current_setting('server_version_num')::integer / 10000 <> 18 THEN
+    RAISE EXCEPTION 'PostgreSQL 18 is required';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_database d
+    JOIN pg_roles r ON r.rolname = current_user
+    WHERE d.datname = current_database()
+      AND d.datdba = r.oid
+      AND r.rolcreatedb
+      AND r.rolcreaterole
+  ) THEN
+    RAISE EXCEPTION 'Unexpected bootstrap administrator capabilities';
+  END IF;
+
+  IF (
+    SELECT pg_get_userbyid(nspowner)
+    FROM pg_namespace
+    WHERE nspname = 'public'
+  ) IS DISTINCT FROM 'pg_database_owner' THEN
+    RAISE EXCEPTION 'Unexpected public schema owner';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_roles
+    WHERE rolname IN (
+      'nthawi_migrator',
+      'nthawi_auth',
+      'nthawi_business',
+      'nthawi_jobs'
+    )
+  ) THEN
+    RAISE EXCEPTION 'Application roles already exist; inspect before continuing';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_namespace
+    WHERE nspname IN ('app_private', 'drizzle', 'pgboss')
+  ) THEN
+    RAISE EXCEPTION 'Application schemas already exist';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+  ) THEN
+    RAISE EXCEPTION 'Public objects already exist; an explicit preservation plan is required';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'vector'
+  ) THEN
+    RAISE EXCEPTION 'vector is already installed; inspect before continuing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_available_extensions WHERE name = 'vector'
+  ) THEN
+    RAISE EXCEPTION 'vector is unavailable';
+  END IF;
+END
+$preflight$;
+
+CREATE ROLE nthawi_migrator NOLOGIN
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOINHERIT NOREPLICATION;
+
+CREATE ROLE nthawi_auth NOLOGIN
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOINHERIT NOREPLICATION;
+
+CREATE ROLE nthawi_business NOLOGIN
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOINHERIT NOREPLICATION;
+
+CREATE ROLE nthawi_jobs NOLOGIN
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOINHERIT NOREPLICATION;
+
+ALTER ROLE nthawi_migrator LOGIN PASSWORD :'migrator_password';
+ALTER ROLE nthawi_auth LOGIN PASSWORD :'auth_password';
+ALTER ROLE nthawi_business LOGIN PASSWORD :'business_password';
+ALTER ROLE nthawi_jobs LOGIN PASSWORD :'jobs_password';
+\unset migrator_password
+\unset auth_password
+\unset business_password
+\unset jobs_password
+
+CREATE EXTENSION vector WITH SCHEMA public;
+
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE CREATE, TEMPORARY ON DATABASE neondb FROM PUBLIC;
+
+GRANT CONNECT ON DATABASE neondb
+  TO nthawi_migrator, nthawi_auth, nthawi_business, nthawi_jobs;
+
+ALTER ROLE nthawi_migrator IN DATABASE neondb SET search_path = public;
+ALTER ROLE nthawi_auth IN DATABASE neondb SET search_path = public;
+ALTER ROLE nthawi_business IN DATABASE neondb SET search_path = public;
+ALTER ROLE nthawi_jobs IN DATABASE neondb SET search_path = public;
+
+GRANT nthawi_migrator TO CURRENT_USER WITH INHERIT FALSE;
+GRANT nthawi_migrator TO CURRENT_USER WITH SET TRUE;
+
+SET LOCAL ROLE nthawi_migrator;
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+RESET ROLE;
+
+ALTER DATABASE neondb OWNER TO nthawi_migrator;
+
+REVOKE nthawi_migrator FROM CURRENT_USER;
+
+COMMIT;

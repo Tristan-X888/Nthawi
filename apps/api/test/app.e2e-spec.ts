@@ -8,6 +8,9 @@ import {
   type ApiResources,
 } from '../src/application.js';
 
+// Cold local module loading is separate from request/readiness deadlines.
+const setupTimeout = process.platform === 'win32' ? 90_000 : 45_000;
+
 describe('Application composition on Fastify', () => {
   let app: NestFastifyApplication | undefined;
   let resources: ApiResources;
@@ -41,7 +44,7 @@ describe('Application composition on Fastify', () => {
       },
       logger: false,
     });
-  });
+  }, setupTimeout);
 
   afterEach(async () => {
     try {

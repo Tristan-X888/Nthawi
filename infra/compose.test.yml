@@ -9,6 +9,7 @@ services:
     ports:
       - "127.0.0.1:5434:5432"
     tmpfs:
+      # Cover PostgreSQL 18's declared VOLUME so no anonymous data volume is made.
       - /var/lib/postgresql
     volumes:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro

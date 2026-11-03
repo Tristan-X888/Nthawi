@@ -12,9 +12,11 @@ saveExact: true
 # Compatible security fixes for the current dependency graph.
 # Revalidate these scoped pins when updating their parent dependencies.
 overrides:
-  "next@16.3.8>sharp": "0.35.5"
+  "next@16.4.1>sharp": "0.35.5"
   "source-map-js@>=1.0.0 <1.2.2": "1.2.2"
-  "next@16.3.8>baseline-browser-mapping": "2.11.27"
+  "next@16.4.1>baseline-browser-mapping": "2.11.27"
+  "express@5.2.1>body-parser": "2.4.0"
+  "@nestjs/platform-express@12.1.0>multer": "2.5.0"
 
 # Reuse cached downloads and tolerate temporary connection interruptions.
 preferOffline: true
