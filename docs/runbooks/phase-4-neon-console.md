@@ -148,7 +148,15 @@ to decide: keep both sets, wait until the endpoint is reachable, then rename the
 password authentication (`postgres_code=28P01`), the commit did not happen:
 delete the three private files, rebuild them with
 `refresh-neon-test-credentials.ps1` (Neon stores SQL-set passwords) and rotate
-again. The export login keeps its provider-generated password. Any future staging or production
+again. The export login keeps its provider-generated password.
+
+`code=NEON_ROTATION_PREFLIGHT_REJECTED stage=role-profiles:<role>:<attribute>`
+means a restricted role no longer has its reviewed profile, and nothing was
+changed. Never loosen the guard. `role-profiles:migrator:memberships` most often
+means Neon Auth was enabled on the branch: enabling it grants the `neon_auth`
+role to the database owner. Check with **Branch > Auth**, decide with the owner,
+disable it with data deletion only on this test branch, re-read the roles, then
+rerun the rotation (done on 2026-11-05; see the evidence record). Any future staging or production
 bootstrap uses `infra/neon/bootstrap.psql`, whose included guard refuses reused
 or missing secrets before any role change.
 

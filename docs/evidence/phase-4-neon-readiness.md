@@ -85,10 +85,26 @@ afterwards (P4-D08, P4-D09 and edits made between 16:56 and 17:01Z), so they are
 | Export `d38ea146`    | Passed 12:25–12:27Z: one held snapshot (12:25:29.111Z), 21 classified relations, zero overdue, dump SHA-256 `9e5ae09006cfb1a733f0817f4852cc500da1fb3bae8186096cafbc16318af49e` (64,996 bytes), catalog `203740bc…`, role/grant capture `ee9e049f…`; three restricted-role dumps denied (`permission-denied`); restored copy matched catalog, 21 counts and 24 row hashes; fixture cleanup verified 12:27:00.756Z. |
 | Capacity             | 12:30:55Z, test endpoint: `max_connections` 450, superuser reserved 4, reserved 0, 446 usable (85.2% unused for the planned 66). The documented minimum-size budget (97 usable) still exceeds the required 88.                                                                                                                                                                                                    |
 
-Out-of-session activity, observed on 2026-11-05 and recorded without inference:
-the test compute started at 14:27, 14:57, 16:14, 16:53, 19:09 and 19:24Z, and
-`nthawi_migrator` was changed by SQL at 19:09:47Z (no control-plane operation).
-The rotation in P4-D08 replaces all four passwords regardless.
+Out-of-session activity, observed on 2026-11-05: the test compute started at
+14:27, 14:57, 16:14, 16:53, 19:09 and 19:24Z. At 19:09:47Z **Neon Auth (Managed
+Better Auth) was enabled on the test branch** outside this work. It created a
+`neon_auth` schema (9 tables: 0 users, 0 sessions, 0 keys, 1 configuration row)
+and granted the `neon_auth` role to the database owner `nthawi_migrator` (SET
+option), which is why that role's control-plane record changed.
+
+## Neon Auth removal and credential rotation (2026-11-05)
+
+| Step                  | Result                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rotation, attempt 1   | Refused before any change: `code=NEON_ROTATION_PREFLIGHT_REJECTED stage=role-profiles` (the migrator's new `neon_auth` membership). The guard worked as designed; the stage now names role and attribute (`role-profiles:migrator:memberships`). |
+| Diagnosis (read-only) | 23:21Z: three runtime roles restricted and unchanged; `nthawi_migrator` member of `neon_auth`; `neon_auth` schema present on the test branch only. Production and the staging project: Neon Auth not enabled.                                    |
+| Owner decision        | Remove Neon Auth from the test branch (P4-D11).                                                                                                                                                                                                  |
+| Removal               | Neon Auth disabled with `delete_data` on `br-rapid-brook-zao6uwya`. 23:34:05Z re-read: schemas `app_private`, `drizzle`, `public` only; no `neon_auth` role; `nthawi_migrator` has no memberships; 20 `public` tables.                           |
+| Rotation, attempt 2   | 23:34:19–23:34:45Z: `NEON_ROLE_PASSWORDS_ROTATED roles=4 distinct=true verified=true`, then `NEON_CONFIGURATION_VERIFIED target=test`. The four restricted roles now hold distinct generated passwords.                                          |
+
+Neon Auth must not be enabled on the acceptance or production branches. Any
+evaluation uses a disposable branch in the staging project under its own
+approval.
 
 ## Decisions
 
@@ -120,9 +136,9 @@ Final-head CI on the pull request is the authoritative cross-runner record.
 
 ## Remaining before acceptance
 
-1. Operator: rotate the test-role passwords (console runbook §4).
-2. Operator: re-run `check-config`, `verify`, isolation, export and capacity on
-   the final commit and record their IDs, hashes and times here (runbook §5–§8).
+1. ~~Rotate the test-role passwords~~ — done 2026-11-05T23:34Z (above).
+2. Re-run `check-config`, `verify`, isolation, export and capacity on the final
+   commit and record their IDs, hashes and times here (runbook §5–§8).
 3. Re-fetch provider metadata and run the assessor (runbook §3).
 4. Pull request: final-head CI, technical review, independent human approval,
    resolved threads, then a separately instructed merge.

@@ -187,25 +187,32 @@ async function preflight(client) {
   const profiles = (
     await client.query(profileSql, [roles.map(([, role]) => role)])
   ).rows
-  const names = profiles.map((profile) => profile?.name).sort()
-  if (
-    JSON.stringify(names) !==
-      JSON.stringify(roles.map(([, role]) => role).sort()) ||
-    profiles.some(
-      (profile) =>
-        profile.rolcanlogin !== true ||
-        [
-          "rolsuper",
-          "rolbypassrls",
-          "rolcreatedb",
-          "rolcreaterole",
-          "rolreplication",
-          "rolinherit",
-          "memberships",
-        ].some((flag) => profile[flag] !== false)
+  // Name the role and attribute (never a value) so an operator can act.
+  // Example: enabling Neon Auth grants neon_auth to the database owner, which
+  // reports role-profiles:migrator:memberships.
+  const reject = (detail) =>
+    fail("NEON_ROTATION_PREFLIGHT_REJECTED", `role-profiles:${detail}`)
+  if (profiles.length !== roles.length) {
+    const missing = roles.find(
+      ([, role]) => !profiles.some((profile) => profile?.name === role)
     )
-  )
-    fail("NEON_ROTATION_PREFLIGHT_REJECTED", "role-profiles")
+    reject(missing ? `${missing[0]}:missing` : "unexpected")
+  }
+  for (const [kind, role] of roles) {
+    const profile = profiles.find((candidate) => candidate?.name === role)
+    if (!profile) reject(`${kind}:missing`)
+    if (profile.rolcanlogin !== true) reject(`${kind}:login`)
+    for (const flag of [
+      "rolsuper",
+      "rolbypassrls",
+      "rolcreatedb",
+      "rolcreaterole",
+      "rolreplication",
+      "rolinherit",
+      "memberships",
+    ])
+      if (profile[flag] !== false) reject(`${kind}:${flag.replace(/^rol/, "")}`)
+  }
 }
 
 async function defaultConnect(options) {

@@ -87,7 +87,10 @@ function fakes({ failAlter, profile, failVerify, lostCommit } = {}) {
           }
         if (/FROM pg_roles r/.test(text))
           return {
-            rows: roles.map((name) => profile?.(name) ?? restricted(name)),
+            // A profile function returning null models a missing role.
+            rows: roles
+              .map((name) => (profile ? profile(name) : restricted(name)))
+              .filter(Boolean),
           }
         if (text.startsWith("ALTER ROLE") && failAlter)
           throw new Error("private ALTER failure with secret detail")
@@ -310,16 +313,30 @@ test("a failed ALTER rolls back, keeps the old files and leaks nothing", async (
   assert.deepEqual((await readdir(directory)).length, 3)
 })
 
-test("a privileged or missing target role is refused before any change", async (t) => {
-  for (const profile of [
-    (name) =>
-      name === "nthawi_auth"
-        ? { ...restricted(name), rolbypassrls: true }
-        : restricted(name),
-    (name) =>
-      name === "nthawi_jobs"
-        ? { ...restricted(name), memberships: true }
-        : restricted(name),
+test("a privileged, extended or missing role is refused, naming the role and attribute", async (t) => {
+  const changed = (role, change) => (name) =>
+    name === role
+      ? change && { ...restricted(name), ...change }
+      : restricted(name)
+  for (const [profile, stage] of [
+    [
+      changed("nthawi_auth", { rolbypassrls: true }),
+      "role-profiles:auth:bypassrls",
+    ],
+    // Enabling Neon Auth on a branch grants neon_auth to the database owner.
+    [
+      changed("nthawi_migrator", { memberships: true }),
+      "role-profiles:migrator:memberships",
+    ],
+    [
+      changed("nthawi_jobs", { rolinherit: true }),
+      "role-profiles:jobs:inherit",
+    ],
+    [
+      changed("nthawi_auth", { rolcanlogin: false }),
+      "role-profiles:auth:login",
+    ],
+    [changed("nthawi_business", null), "role-profiles:business:missing"],
   ]) {
     const directory = await privateDirectory()
     t.after(() => rm(directory, { recursive: true, force: true }))
@@ -329,7 +346,10 @@ test("a privileged or missing target role is refused before any change", async (
         directory,
         connect: fake.connect,
       }),
-      /NEON_ROTATION_PREFLIGHT_REJECTED/
+      (error) =>
+        error.message === "NEON_ROTATION_PREFLIGHT_REJECTED" &&
+        error.stage === stage &&
+        /^[a-z0-9:-]{1,40}$/.test(error.stage)
     )
     assert.equal(
       fake.statements.some(({ text }) => text.startsWith("ALTER ROLE")),
