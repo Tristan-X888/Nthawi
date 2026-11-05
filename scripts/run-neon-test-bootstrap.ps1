@@ -104,6 +104,16 @@ try {
         }
     }
 
+    # The included guard refuses missing or reused secrets inside psql too.
+    if (-not [regex]::IsMatch(
+        $bootstrapContent,
+        '(?m)^\\ir\s+bootstrap-password-guard\.psql\s*$'
+    ) -or -not (Test-Path -LiteralPath (
+        Join-Path (Split-Path -Parent $bootstrapFile) 'bootstrap-password-guard.psql'
+    ) -PathType Leaf)) {
+        throw 'Bootstrap does not include bootstrap-password-guard.psql. Inspect bootstrap.psql before continuing.'
+    }
+
     Write-Host "Bootstrap environment-loading directives found." `
         -ForegroundColor Green
 
@@ -220,6 +230,17 @@ try {
             $secureValue.Dispose()
         }
     }
+
+    # Refuse reuse before any connection: one leaked runtime secret must never
+    # authenticate as another role. Values are compared in memory only.
+    $distinctSecrets = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($name in $secretNames) {
+        if (-not $distinctSecrets.Add([Environment]::GetEnvironmentVariable($name, 'Process'))) {
+            $distinctSecrets.Clear()
+            throw 'Each role password must be different. No SQL executed.'
+        }
+    }
+    $distinctSecrets.Clear()
 
     # --------------------------------------------------
     # 8. Configure verified TLS

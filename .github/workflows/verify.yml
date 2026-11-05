@@ -89,6 +89,27 @@ jobs:
           AUTH_TEST_ADMIN_URL: postgresql://testadmin:synthetic-test-password@127.0.0.1:5434/nthawi_test
         run: pnpm test:integration
 
+      # Ubuntu 24.04 ships PostgreSQL 16 clients only. postgresql-common, from
+      # Ubuntu's signed archive, carries the PGDG signing key and setup script,
+      # so no key is downloaded on trust. ca-certificates is explicit: without
+      # it the PGDG index fails TLS verification and the script still exits 0.
+      - name: Install PostgreSQL 18 export clients
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ca-certificates postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes --no-install-recommends postgresql-client-18
+          for tool in pg_dump pg_restore psql; do
+            /usr/lib/postgresql/18/bin/"$tool" --version | grep -E "^${tool} \(PostgreSQL\) 18\."
+          done
+
+      - name: Verify Phase 4 SQL isolation, content barrier and export restore
+        env:
+          RLS_TEST_ADMIN_URL: postgresql://testadmin:synthetic-test-password@127.0.0.1:5434/nthawi_test
+          NEON_EXPORT_TEST_PG_BIN: /usr/lib/postgresql/18/bin
+        run: pnpm test:neon-readiness:integration
+
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
 

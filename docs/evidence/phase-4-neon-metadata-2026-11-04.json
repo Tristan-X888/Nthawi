@@ -1,0 +1,58 @@
+{
+  "observedUtc": "2026-11-04T15:33:42.093Z",
+  "source": "Authenticated Neon MCP metadata APIs; no SQL or credentials requested",
+  "project": {
+    "id": "delicate-feather-83629956",
+    "org_id": "org-wild-bird-68149107",
+    "region_id": "aws-eu-west-2",
+    "pg_version": 18,
+    "history_retention_seconds": 21600,
+    "branch_logical_size_limit_bytes": 1073741824,
+    "subscription_type": "free_v3"
+  },
+  "branches": [
+    {
+      "id": "br-lively-darkness-zahxet6z",
+      "project_id": "delicate-feather-83629956",
+      "name": "production",
+      "current_state": "archived",
+      "protected": false
+    },
+    {
+      "id": "br-rapid-brook-zao6uwya",
+      "project_id": "delicate-feather-83629956",
+      "parent_id": "br-lively-darkness-zahxet6z",
+      "name": "test/nthawi-database-bootstrap",
+      "current_state": "archived",
+      "protected": false
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "ep-wild-leaf-za09k0vy",
+      "project_id": "delicate-feather-83629956",
+      "branch_id": "br-lively-darkness-zahxet6z",
+      "host": "ep-wild-leaf-za09k0vy.c-2.eu-west-2.aws.neon.tech",
+      "type": "read_write",
+      "region_id": "aws-eu-west-2",
+      "current_state": "idle",
+      "autoscaling_limit_min_cu": 0.25,
+      "autoscaling_limit_max_cu": 2,
+      "suspend_timeout_seconds": 0,
+      "disabled": false
+    },
+    {
+      "id": "ep-cold-shadow-zaqw3flo",
+      "project_id": "delicate-feather-83629956",
+      "branch_id": "br-rapid-brook-zao6uwya",
+      "host": "ep-cold-shadow-zaqw3flo.c-2.eu-west-2.aws.neon.tech",
+      "type": "read_write",
+      "region_id": "aws-eu-west-2",
+      "current_state": "idle",
+      "autoscaling_limit_min_cu": 0.25,
+      "autoscaling_limit_max_cu": 2,
+      "suspend_timeout_seconds": 0,
+      "disabled": false
+    }
+  ]
+}

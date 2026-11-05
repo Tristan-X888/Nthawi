@@ -26,8 +26,9 @@ function environment() {
   ]) {
     const role = `nthawi_${kind}`
     result[`DATABASE_${kind.toUpperCase()}_ROLE`] = role
+    // Distinct per role: shared credentials are refused by the reader.
     result[variable] =
-      `postgresql://${role}:synthetic-password@${host}:5432/` +
+      `postgresql://${role}:synthetic-password-${kind}@${host}:5432/` +
       "neondb?sslmode=verify-full"
   }
 
@@ -70,6 +71,40 @@ test("accepts all four approved test connections", () => {
         new URL(connectionString).hostname === NEON_TARGETS.test.host
     )
   )
+})
+
+test("refuses role credentials that share a password, for test and production", () => {
+  for (const values of [testEnvironment(), environment()]) {
+    if (values.NEON_TARGET === "production")
+      values.NEON_EXPECTED_BRANCH_ID = NEON_TARGETS.production.branchId
+    values.JOBS_DATABASE_URL = values.JOBS_DATABASE_URL.replace(
+      "synthetic-password-jobs",
+      "synthetic-password-migrator"
+    )
+    assert.throws(() => readNeonConnections(values), {
+      ...invalidConfiguration,
+      stage: "configuration:password-reuse",
+    })
+  }
+})
+
+test("configuration check names password reuse without disclosing values", async () => {
+  const values = testEnvironment()
+  values.AUTH_DATABASE_URL = values.AUTH_DATABASE_URL.replace(
+    "synthetic-password-auth",
+    "synthetic-password-business"
+  )
+  const result = await runWithoutDatabaseBuild("--check-config", values)
+  assert.equal(result.status, 1)
+  assert.match(
+    result.stderr,
+    /^code=NEON_CONNECTION_CONFIGURATION_INVALID stage=configuration:password-reuse postgres_code=none network_code=none$/m
+  )
+  assert.doesNotMatch(
+    result.stderr + result.stdout,
+    /synthetic-password|postgresql:\/\//
+  )
+  assert.doesNotMatch(result.stdout, /NEON_CONFIGURATION_VERIFIED/)
 })
 
 test("rejects production credentials mixed into the test environment", () => {
@@ -120,7 +155,7 @@ test("sanitizes malformed URL encoding in the path, username and password", () =
   for (const change of [
     (value) => value.replace("/neondb?", "/%ZZ?"),
     (value) => value.replace("nthawi_auth:", "%ZZ:"),
-    (value) => value.replace("synthetic-password", "%ZZ"),
+    (value) => value.replace("synthetic-password-auth", "%ZZ"),
   ]) {
     const values = environment()
     values.AUTH_DATABASE_URL = change(values.AUTH_DATABASE_URL)
@@ -448,7 +483,7 @@ test("each role connects with its own decoded password and explicit verified TLS
   const connections = readNeonConnections(values)
   for (const profile of connections) {
     values[profile.variable] = values[profile.variable].replace(
-      "synthetic-password",
+      `synthetic-password-${profile.kind}`,
       `${profile.kind}%40synthetic%3Apassword`
     )
   }
