@@ -56,6 +56,19 @@ history, tax and FX extra). Compute updates on paid plans are applied in the
 project's chosen update window (Settings > Postgres); manual weekly restarts are
 only needed above 16 CU.
 
+## Archived branch lifecycle
+
+On 2026-11-04T15:33Z ([earlier metadata](phase-4-neon-metadata-2026-11-04.json))
+the project was on the Free plan (`free_v3`, six-hour history) and both branches
+were **archived** and unprotected. The test branch was unarchived by the
+authorized connection at 2026-11-05T10:22Z. Production became ready when the
+owner applied the Launch, protection and compute settings, and its always-on
+compute has run since 11:14:53Z. Any SQL connection or branch-level operation
+unarchives a branch and its parents, so every runner treats such a call as a
+remote operation that needs specific authority; project-level metadata reads do
+not unarchive. A protected, always-on production compute is not archived while
+it runs.
+
 ## Live acceptance on the test branch (2026-11-05, before the final code)
 
 These runs used the code as it stood at 12:01–12:31Z. The scripts changed
