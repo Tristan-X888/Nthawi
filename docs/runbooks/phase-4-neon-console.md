@@ -364,8 +364,14 @@ Record UTC time and what you saw; never record passwords or billing details.
    Malawi). Production is always on, so this decides when its brief restart for
    updates happens. Launch posts the notice in the console only, three days
    ahead.
-7. **Do not** enable **Auth** (Managed Better Auth), the Data API, IP Allow or
+7. **Compute defaults (recommended once).** **Settings > Postgres > Compute
+   defaults** still shows the project default 0.25-8 CU with provider-default
+   suspension. It applies only to computes created later (for example a restore
+   or rehearsal branch), not to the two existing endpoints. Set minimum 0.25 CU,
+   maximum 1 CU and scale to zero after 5 minutes so a new branch cannot
+   silently autoscale to 8 CU. Save, then re-read metadata (item 9).
+8. **Do not** enable **Auth** (Managed Better Auth), the Data API, IP Allow or
    any new branch on either project in Phase 4 (P4-D11). Do not change the
    `nthawi-staging` project; it is configured in Phase 5.
-8. **Re-read.** After any save, re-run the metadata step in §3 and the assessor
+9. **Re-read.** After any save, re-run the metadata step in §3 and the assessor
    within one hour.
