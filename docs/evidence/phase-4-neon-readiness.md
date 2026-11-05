@@ -1,10 +1,10 @@
 # Phase 4: Neon readiness evidence
 
-Date: 5 November 2026 (UTC). **G-01 status: implementation complete and
-verified offline on Windows and Linux; final-commit live re-proofs pending the
-operator's role-password rotation; repository acceptance pending.** Phase 4 is
-not accepted until its pull request has final-head CI, an independent human
-approval, resolved threads and a separately instructed merge.
+Date: 5 November 2026 (UTC). **G-01 status: implementation complete; verified
+offline on Windows and Linux and live on the final code (commit `debac37`);
+repository acceptance pending.** Phase 4 is not accepted until its pull request
+has final-head CI, an independent human approval, resolved threads and a
+separately instructed merge.
 
 ## Authority and dependency
 
@@ -36,9 +36,10 @@ approval, resolved threads and a separately instructed merge.
 
 Project-level reads only (no SQL), recorded in
 [the sanitized metadata](phase-4-neon-metadata-2026-11-05.json), observed
-2026-11-05T22:41:14Z. The offline assessor passed all 16 configuration checks
-on it (`productionConfigurationReady: true`; `phase4Ready` stays false by
-design). It rejects metadata older than one hour, so acceptance re-fetches it.
+2026-11-05T23:50:49Z, after the final live proofs. The offline assessor passed
+all 16 configuration checks on it (`productionConfigurationReady: true`;
+`phase4Ready` stays false by design). It rejects metadata older than one hour,
+so any later acceptance re-fetches it.
 
 | Item                   | Observed value                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -106,6 +107,22 @@ Neon Auth must not be enabled on the acceptance or production branches. Any
 evaluation uses a disposable branch in the staging project under its own
 approval.
 
+## Final-commit live acceptance (code commit `debac37`, 2026-11-05)
+
+All runs on `br-rapid-brook-zao6uwya` under authorization
+`owner-answer-2026-11-05T1114Z-test-acceptance`, after the rotation above.
+Private records are kept outside the repository in
+`Nthawi-phase4-evidence-private-final`.
+
+| Check                | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-config`       | Passed 23:36:20–23:36:22Z (offline; distinct-password guard satisfied).                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `verify`             | Passed on the first attempt, 23:36:22–23:37:14Z: four roles verified with the rotated credentials, application readiness, `NEON_ACCEPTANCE_PASSED`, `NEON_API_ACCEPTANCE_PASSED shutdown_mode=ipc-sigterm-hook`.                                                                                                                                                                                                                                                                                                                          |
+| Isolation `bdce5a76` | Passed 23:45:43Z: 12 forced-RLS tables, 2 tenants, 24 fresh synthetic rows, business/auth/jobs roles, reuse, concurrency and rollback; cleanup verified.                                                                                                                                                                                                                                                                                                                                                                                  |
+| Export `5276086c`    | Passed 23:46:28–23:49:18Z (manifest v3): snapshot 23:46:52.890Z; 21 relations, 0 overdue; `rate_limit` data excluded; dump SHA-256 `6fddf869d8cd6e3a882b40a3fa6cea19a06dc8070e30960d77b05a5804ef1051` (64,754 bytes); catalog `203740bc…` and role/grant capture `ee9e049f…`, both identical to the earlier run; `SET ROLE neon_superuser` refused (XX000); three restricted-role dumps `permission-denied`; restored copy matched catalog, 21 counts and 24 row hashes; owned container removed; fixture cleanup verified 23:49:13.473Z. |
+| Capacity             | 23:50:13Z: `max_connections` 450, superuser reserved 4, reserved 0 → 446 usable (85.2% unused for 66). Documented minimum-size budget 97 usable (31.96% unused) ≥ the 25% target.                                                                                                                                                                                                                                                                                                                                                         |
+| Provider metadata    | 23:50:49Z: assessor 16/16, `productionConfigurationReady: true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
 ## Decisions
 
 | ID     | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -136,10 +153,9 @@ Final-head CI on the pull request is the authoritative cross-runner record.
 
 ## Remaining before acceptance
 
-1. ~~Rotate the test-role passwords~~ — done 2026-11-05T23:34Z (above).
-2. Re-run `check-config`, `verify`, isolation, export and capacity on the final
-   commit and record their IDs, hashes and times here (runbook §5–§8).
-3. Re-fetch provider metadata and run the assessor (runbook §3).
+1. ~~Rotate the test-role passwords~~ — done 2026-11-05T23:34Z.
+2. ~~Final-commit live re-proofs~~ — done on `debac37` (above).
+3. ~~Fresh provider metadata and assessor~~ — 16/16 at 23:50:49Z.
 4. Pull request: final-head CI, technical review, independent human approval,
    resolved threads, then a separately instructed merge.
 

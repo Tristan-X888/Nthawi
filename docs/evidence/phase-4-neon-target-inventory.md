@@ -1,7 +1,7 @@
 # Phase 4 — Neon target inventory
 
-**Observed:** 2026-11-05 UTC (project-level metadata, 22:41:14Z; assessor passed)
-**Status:** targets and settings verified; final-commit live re-proofs pending
+**Observed:** 2026-11-05 UTC (project-level metadata, 23:50:49Z; assessor passed)
+**Status:** targets, settings and final-commit live proofs verified; review pending
 **Project:** Nthawi, `delicate-feather-83629956`, `aws-eu-west-2`, PostgreSQL 18
 
 ## Production target
@@ -39,8 +39,9 @@
 - [x] Privileged full export and verified restore (2026-11-05, before final code)
 - [x] Capacity headroom at minimum compute (2026-11-05, 446 usable)
 - [x] Promotion implementation and offline tests
-- [ ] Test-role password rotation (operator, P4-D08)
-- [ ] Final-commit live re-proofs (operator, P4-D10)
+- [x] Test-role password rotation (P4-D08; 2026-11-05T23:34Z, after removing
+      the out-of-session Neon Auth enablement)
+- [x] Final-commit live re-proofs (P4-D10; code commit `debac37`)
 - [ ] Final-head CI, technical review and independent human approval
 - [ ] Separately instructed merge
 

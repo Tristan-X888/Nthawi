@@ -1,5 +1,5 @@
 {
-  "observedUtc": "2026-11-05T22:41:14.000Z",
+  "observedUtc": "2026-11-05T23:50:49.000Z",
   "source": "Authenticated Neon MCP describe_project/list_branches/list_postgres_endpoints (project-level reads); no SQL",
   "project": {
     "id": "delicate-feather-83629956",
@@ -37,7 +37,7 @@
       "host": "ep-cold-shadow-zaqw3flo.c-2.eu-west-2.aws.neon.tech",
       "type": "read_write",
       "region_id": "aws-eu-west-2",
-      "current_state": "idle",
+      "current_state": "active",
       "autoscaling_limit_min_cu": 0.25,
       "autoscaling_limit_max_cu": 1,
       "suspend_timeout_seconds": 300,
