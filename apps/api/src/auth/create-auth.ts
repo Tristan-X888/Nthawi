@@ -38,7 +38,11 @@ export function createAuth(
       // Email changes use the OTP plugin below. The core link flow is not
       // compatible with overrideDefaultEmailVerification.
       changeEmail: { enabled: false },
-      deleteUser: { enabled: true },
+      // Never enable: Better Auth deletes identity rows directly, bypassing the
+      // deletion journal, the immediate-denial/7-day-purge contract and the
+      // export barrier, so a restore could resurrect the account. Account
+      // deletion ships only through the reviewed Phase 6 design (D6-6).
+      deleteUser: { enabled: false },
     },
     session: {
       freshAge: OWNER_SESSION_FRESH_SECONDS,
