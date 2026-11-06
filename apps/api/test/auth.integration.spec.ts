@@ -628,30 +628,21 @@ describe('Better Auth over Nest/Fastify and PostgreSQL', () => {
     ).toBe(400);
   });
 
-  it('rejects deletion after fifteen minutes and removes identity records with a fresh session', async () => {
+  it('refuses Better Auth self-service deletion even with a fresh session and keeps identity records', async () => {
+    // Deletion must follow the reviewed journal/purge design (D6-6). Better
+    // Auth's endpoint deletes identity rows directly, so it stays disabled.
     const owner = await passwordAccount('delete-owner@example.test');
     expect((await post('/delete-user', {})).status).toBe(401);
-    await setup!.pool.query(
-      'UPDATE "session" SET created_at = now() - interval \'16 minutes\' WHERE user_id = $1',
-      [owner.id],
-    );
-    const stale = await post('/delete-user', {}).set('Cookie', owner.cookie);
-    expect(stale.status).toBe(400);
-    expect(stale.body.code).toBe('SESSION_EXPIRED');
-    expect(
-      (
-        await setup!.pool.query('SELECT id FROM "user" WHERE id = $1', [
-          owner.id,
-        ])
-      ).rowCount,
-    ).toBe(1);
-    await setup!.pool.query(
-      'UPDATE "session" SET created_at = now() - interval \'14 minutes\' WHERE user_id = $1',
-      [owner.id],
-    );
-    expect(
-      (await post('/delete-user', {}).set('Cookie', owner.cookie)).status,
-    ).toBe(200);
+
+    const fresh = await post('/delete-user', {}).set('Cookie', owner.cookie);
+    expect(fresh.status).toBe(404);
+
+    const callback = await request(app!.getHttpServer())
+      .get('/api/auth/delete-user/callback?token=synthetic-token')
+      .set('Origin', env.WEB_ORIGIN)
+      .set('Cookie', owner.cookie);
+    expect(callback.status).toBe(404);
+
     for (const table of ['user', 'session', 'account']) {
       const column = table === 'user' ? 'id' : 'user_id';
       expect(
@@ -661,12 +652,29 @@ describe('Better Auth over Nest/Fastify and PostgreSQL', () => {
             [owner.id],
           )
         ).rowCount,
-      ).toBe(0);
+      ).toBeGreaterThan(0);
     }
     const session = await request(app!.getHttpServer())
       .get('/api/auth/get-session')
       .set('Cookie', owner.cookie);
-    expect(session.body).toBeNull();
+    expect(session.status).toBe(200);
+    expect(session.body?.user?.id).toBe(owner.id);
+  });
+
+  it('enforces the owner freshness window on fresh-session endpoints', async () => {
+    // Previously asserted through delete-user. In Better Auth 1.7.7 the
+    // freshAge middleware guards /unlink-account; keep the policy covered.
+    const owner = await passwordAccount('fresh-owner@example.test');
+    await setup!.pool.query(
+      'UPDATE "session" SET created_at = now() - interval \'16 minutes\' WHERE user_id = $1',
+      [owner.id],
+    );
+    const stale = await post('/unlink-account', {
+      providerId: 'credential',
+      accountId: owner.id,
+    }).set('Cookie', owner.cookie);
+    expect(stale.status).toBe(403);
+    expect(stale.body.code).toBe('SESSION_NOT_FRESH');
   });
 
   it('limits repeated OTP requests through the shared database rate limiter', async () => {
