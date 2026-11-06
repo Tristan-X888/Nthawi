@@ -28,6 +28,38 @@ function reject() {
 }
 
 /**
+ * Each login must hold its own secret, so one leaked runtime credential can
+ * never authenticate as another role (for example the DDL-owning migrator).
+ * Values are compared in memory only and never reported.
+ */
+export function hasDistinctPasswords(passwords) {
+  return (
+    Array.isArray(passwords) &&
+    passwords.length > 1 &&
+    passwords.every((value) => typeof value === "string" && value.length > 0) &&
+    new Set(passwords).size === passwords.length
+  )
+}
+
+/**
+ * Diagnostic only: true when all four role URLs parse and at least two share a
+ * decoded password. It lets a runner name the failure without disclosing it.
+ */
+export function rolePasswordReuseDetected(env) {
+  try {
+    const passwords = connections.map(([urlName]) =>
+      decodeURIComponent(new URL(env?.[urlName]).password)
+    )
+    return (
+      passwords.every((value) => value.length > 0) &&
+      !hasDistinctPasswords(passwords)
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
  * Resolve a Neon target from an explicitly selected environment.
  *
  * Supported targets:
@@ -60,7 +92,7 @@ export function resolveNeonTarget(env) {
  * - PostgreSQL port 5432.
  * - Expected database name.
  * - Four individual restricted roles.
- * - Non-empty database passwords.
+ * - Non-empty database passwords, different for every role.
  * - Exactly one sslmode=verify-full parameter.
  * - No pooled endpoint or additional connection parameters.
  *
@@ -72,6 +104,7 @@ export function assertNeonTestEnvironment(env) {
   }
 
   const target = resolveNeonTarget(env)
+  const passwords = []
 
   for (const [urlName, roleName, expectedRole] of connections) {
     if (env[roleName] !== expectedRole) {
@@ -110,6 +143,12 @@ export function assertNeonTestEnvironment(env) {
     ) {
       reject()
     }
+
+    passwords.push(password)
+  }
+
+  if (!hasDistinctPasswords(passwords)) {
+    reject()
   }
 
   return target

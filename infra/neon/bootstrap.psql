@@ -18,19 +18,8 @@
 \getenv business_password DATABASE_BUSINESS_PASSWORD
 \getenv jobs_password DATABASE_JOBS_PASSWORD
 
-SELECT :'migrator_password' <> ''
-   AND :'auth_password' <> ''
-   AND :'business_password' <> ''
-   AND :'jobs_password' <> '' AS passwords_supplied \gset
-
-\if :passwords_supplied
-\else
-DO $passwords$
-BEGIN
-  RAISE EXCEPTION 'Set all DATABASE_{MIGRATOR,AUTH,BUSINESS,JOBS}_PASSWORD environment variables';
-END
-$passwords$;
-\endif
+-- Refuses missing secrets and any secret shared by two roles.
+\ir bootstrap-password-guard.psql
 
 BEGIN;
 

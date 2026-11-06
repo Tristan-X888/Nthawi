@@ -4,8 +4,10 @@ import { pathToFileURL } from "node:url"
 import {
   assertNeonTestEnvironment,
   assertVerifiedNeonClient,
+  hasDistinctPasswords,
   neonTestConnectionOptions,
   resolveNeonTarget,
+  rolePasswordReuseDetected,
   withVerifiedNeonClient,
 } from "./neon-targets.mjs"
 
@@ -116,9 +118,24 @@ export function readNeonConnections(environment) {
   } catch {
     fail("NEON_CONNECTION_CONFIGURATION_INVALID", "configuration:target")
   }
-  return PROFILES.map((profile) =>
+  const connections = PROFILES.map((profile) =>
     validateConnection(environment, profile, target)
   )
+  // Shared by the test verifier and production promotion: no two roles may
+  // authenticate with the same secret. Only the stage name is reported.
+  if (
+    !hasDistinctPasswords(
+      connections.map(({ connectionString }) =>
+        decodeURIComponent(new URL(connectionString).password)
+      )
+    )
+  ) {
+    fail(
+      "NEON_CONNECTION_CONFIGURATION_INVALID",
+      "configuration:password-reuse"
+    )
+  }
+  return connections
 }
 
 async function verifyProfile(handle, profile) {
@@ -347,7 +364,12 @@ export async function verifyNeonDatabase(environment, mode, dependencies) {
   try {
     assertNeonTestEnvironment(environment)
   } catch {
-    fail("NEON_CONNECTION_CONFIGURATION_INVALID", "configuration:test-target")
+    fail(
+      "NEON_CONNECTION_CONFIGURATION_INVALID",
+      rolePasswordReuseDetected(environment)
+        ? "configuration:password-reuse"
+        : "configuration:test-target"
+    )
   }
   const connections = readNeonConnections(environment)
   if (mode === "--check-config") {

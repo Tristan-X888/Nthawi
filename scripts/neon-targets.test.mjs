@@ -6,8 +6,10 @@ import {
   assertNeonTestEnvironment,
   assertNeonTestSession,
   guardNeonMigrationTarget,
+  hasDistinctPasswords,
   resolveNeonTarget,
   neonTestConnectionOptions,
+  rolePasswordReuseDetected,
   withVerifiedNeonClient,
 } from "./neon-targets.mjs"
 
@@ -16,8 +18,8 @@ const host = "ep-cold-shadow-zaqw3flo.c-2.eu-west-2.aws.neon.tech"
 /**
  * Create a synthetic Neon test environment.
  *
- * These are test-only credentials.
- * No production credentials are used.
+ * These are test-only credentials. Every role has its own password, as the
+ * guard requires; no production credentials are used.
  */
 const env = () => ({
   NEON_TARGET: "test",
@@ -25,19 +27,19 @@ const env = () => ({
   NEON_EXPECTED_BRANCH_ID: "br-rapid-brook-zao6uwya",
 
   DATABASE_MIGRATION_URL:
-    `postgresql://nthawi_migrator:synthetic-password@${host}:5432/` +
+    `postgresql://nthawi_migrator:synthetic-password-migrator@${host}:5432/` +
     "neondb?sslmode=verify-full",
 
   AUTH_DATABASE_URL:
-    `postgresql://nthawi_auth:synthetic-password@${host}:5432/` +
+    `postgresql://nthawi_auth:synthetic-password-auth@${host}:5432/` +
     "neondb?sslmode=verify-full",
 
   DATABASE_URL:
-    `postgresql://nthawi_business:synthetic-password@${host}:5432/` +
+    `postgresql://nthawi_business:synthetic-password-business@${host}:5432/` +
     "neondb?sslmode=verify-full",
 
   JOBS_DATABASE_URL:
-    `postgresql://nthawi_jobs:synthetic-password@${host}:5432/` +
+    `postgresql://nthawi_jobs:synthetic-password-jobs@${host}:5432/` +
     "neondb?sslmode=verify-full",
 
   DATABASE_MIGRATOR_ROLE: "nthawi_migrator",
@@ -146,7 +148,7 @@ for (const [name, transform] of [
     "missing password",
     (e) => {
       e.JOBS_DATABASE_URL = e.JOBS_DATABASE_URL.replace(
-        "synthetic-password",
+        "synthetic-password-jobs",
         ""
       )
     },
@@ -162,7 +164,7 @@ for (const [name, transform] of [
     "invalid password encoding",
     (e) => {
       e.JOBS_DATABASE_URL = e.JOBS_DATABASE_URL.replace(
-        "synthetic-password",
+        "synthetic-password-jobs",
         "%ZZ"
       )
     },
@@ -171,8 +173,36 @@ for (const [name, transform] of [
     "NUL password",
     (e) => {
       e.JOBS_DATABASE_URL = e.JOBS_DATABASE_URL.replace(
-        "synthetic-password",
+        "synthetic-password-jobs",
         "%00"
+      )
+    },
+  ],
+  [
+    "a runtime role reusing the migrator password",
+    (e) => {
+      e.DATABASE_URL = e.DATABASE_URL.replace(
+        "synthetic-password-business",
+        "synthetic-password-migrator"
+      )
+    },
+  ],
+  [
+    "two runtime roles sharing one password",
+    (e) => {
+      e.JOBS_DATABASE_URL = e.JOBS_DATABASE_URL.replace(
+        "synthetic-password-jobs",
+        "synthetic-password-auth"
+      )
+    },
+  ],
+  [
+    "reuse disguised by percent-encoding",
+    (e) => {
+      // Decodes to the auth password; comparison is on decoded values.
+      e.DATABASE_URL = e.DATABASE_URL.replace(
+        "synthetic-password-business",
+        "synthetic%2Dpassword%2Dauth"
       )
     },
   ],
@@ -199,6 +229,32 @@ test("leaves existing local migration path intact", () => {
   })
 
   assert.equal(result, false)
+})
+
+test("distinct-password check requires at least two non-empty, different values", () => {
+  assert.equal(hasDistinctPasswords(["a", "b", "c", "d"]), true)
+  assert.equal(hasDistinctPasswords(["a", "b", "a"]), false)
+  assert.equal(hasDistinctPasswords(["a", ""]), false)
+  assert.equal(hasDistinctPasswords(["a", null]), false)
+  assert.equal(hasDistinctPasswords(["only-one"]), false)
+  assert.equal(hasDistinctPasswords([]), false)
+  assert.equal(hasDistinctPasswords("ab"), false)
+})
+
+test("password-reuse diagnostic reports only a parseable, reused configuration", () => {
+  assert.equal(rolePasswordReuseDetected(env()), false)
+
+  const reused = env()
+  reused.AUTH_DATABASE_URL = reused.AUTH_DATABASE_URL.replace(
+    "synthetic-password-auth",
+    "synthetic-password-jobs"
+  )
+  assert.equal(rolePasswordReuseDetected(reused), true)
+
+  const malformed = env()
+  malformed.DATABASE_URL = "not a url"
+  assert.equal(rolePasswordReuseDetected(malformed), false)
+  assert.equal(rolePasswordReuseDetected({}), false)
 })
 
 for (const connectionString of [

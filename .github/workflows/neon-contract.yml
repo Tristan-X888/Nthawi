@@ -55,6 +55,9 @@ jobs:
       - name: Verify Neon database validator
         run: node --test scripts/verify-neon-database.test.mjs
 
+      - name: Verify Phase 4 readiness, recovery and production guards without credentials
+        run: pnpm test:neon-readiness
+
       - name: Build compiled API and its workspace dependencies
         run: pnpm exec turbo run build --filter=@nthawi/api
 
@@ -68,4 +71,7 @@ jobs:
 
       - name: Verify isolated runner lifecycle
         shell: pwsh
-        run: ./scripts/run-neon-database.test.ps1
+        run: |
+          ./scripts/run-neon-database.test.ps1
+          ./scripts/run-neon-readiness.test.ps1
+          ./scripts/rotate-neon-test-credentials.test.ps1
