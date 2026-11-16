@@ -99,7 +99,9 @@ function harness({ platform = "linux", closedPools = 2 } = {}) {
             status = 403
             body = { code: "INVALID_ORIGIN", message: "Invalid origin" }
           } else {
-            assert.deepEqual(options.headers, {})
+            assert.equal(typeof options.headers["x-nf-sign"], "string")
+            const { "x-nf-sign": _signature, ...headers } = options.headers
+            assert.deepEqual(headers, {})
             status = 401
             body = {
               code: "UNAUTHORIZED",
@@ -109,7 +111,11 @@ function harness({ platform = "linux", closedPools = 2 } = {}) {
         }
         return Response.json(body, {
           status,
-          headers: { "Cache-Control": "no-store" },
+          headers: {
+            "Cache-Control": options.headers?.["x-nf-sign"]
+              ? "private, no-store"
+              : "no-store",
+          },
         })
       },
     },

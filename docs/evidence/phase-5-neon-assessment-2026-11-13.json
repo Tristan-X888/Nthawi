@@ -1,0 +1,85 @@
+{
+  "evidenceKind": "provider-metadata-only",
+  "observedUtc": "2026-11-13T07:53:43Z",
+  "target": {
+    "projectId": "delicate-feather-83629956",
+    "branchId": "br-lively-darkness-zahxet6z",
+    "host": "ep-wild-leaf-za09k0vy.c-2.eu-west-2.aws.neon.tech",
+    "database": "neondb"
+  },
+  "checks": [
+    {
+      "name": "fresh-metadata",
+      "passed": true
+    },
+    {
+      "name": "project",
+      "passed": true
+    },
+    {
+      "name": "organization",
+      "passed": true
+    },
+    {
+      "name": "region",
+      "passed": true
+    },
+    {
+      "name": "postgres-18",
+      "passed": true
+    },
+    {
+      "name": "launch-plan",
+      "passed": true
+    },
+    {
+      "name": "seven-day-history-configured",
+      "passed": true
+    },
+    {
+      "name": "one-production-branch",
+      "passed": true
+    },
+    {
+      "name": "production-protected",
+      "passed": true
+    },
+    {
+      "name": "production-not-archived",
+      "passed": true
+    },
+    {
+      "name": "one-production-writer",
+      "passed": true
+    },
+    {
+      "name": "exact-direct-endpoint",
+      "passed": true
+    },
+    {
+      "name": "compute-region",
+      "passed": true
+    },
+    {
+      "name": "autoscaling-range",
+      "passed": true
+    },
+    {
+      "name": "scale-to-zero-disabled",
+      "passed": true
+    },
+    {
+      "name": "compute-available",
+      "passed": true
+    }
+  ],
+  "productionConfigurationReady": true,
+  "phase4Ready": false,
+  "stillRequires": [
+    "authorized isolated migration rehearsal and runtime acceptance",
+    "synthetic tenant isolation and cleanup",
+    "complete privileged export, deletion barrier and restored comparison",
+    "observed capacity at the selected minimum compute",
+    "usable recovery history, reviewed promotion and repository acceptance"
+  ]
+}

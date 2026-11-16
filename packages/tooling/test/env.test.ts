@@ -228,6 +228,11 @@ function deployedEnv(): NodeJS.ProcessEnv {
     WEB_ORIGIN: "https://app.example.test",
     BETTER_AUTH_URL: "https://app.example.test",
     WIDGET_ORIGIN: "https://widget.example.test",
+    NETLIFY_PROXY_SIGNING_SECRET:
+      "synthetic-proxy-secret-longer-than-32-characters",
+    PROXY_EXPECTED_SITE_URL: "https://owner.netlify.app",
+    PROXY_EXPECTED_NETLIFY_ID: "synthetic-owner-site",
+    PROXY_EXPECTED_DEPLOY_CONTEXT: "production",
   }
 }
 

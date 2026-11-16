@@ -10,6 +10,7 @@ import { AppModule } from './app.module.js';
 import { configureAuthHttp } from './auth/http.js';
 import type { ApiAuth } from './auth/owner-session.js';
 import type { ApiResources } from './resources.js';
+import { configureSignedProxy } from './proxy/signed-proxy.js';
 
 export interface ApiApplicationOptions {
   env: ServerEnv;
@@ -47,6 +48,7 @@ export async function createApiApplication({
       { abortOnError: false, ...(logger !== undefined ? { logger } : {}) },
     );
     app.getHttpAdapter().getInstance().decorateRequest('ownerSession', null);
+    configureSignedProxy(app.getHttpAdapter().getInstance(), env);
     app
       .getHttpAdapter()
       .getInstance()

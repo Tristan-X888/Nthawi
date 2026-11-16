@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test test/env.test.ts",
+    "test": "node --test test/env.test.ts test/env-proxy.test.ts",
     "env:check": "pnpm run build && node scripts/check-env.mjs"
   },
   "dependencies": {

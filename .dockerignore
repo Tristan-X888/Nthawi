@@ -2,6 +2,7 @@
 .github
 .agents
 .codex
+.anchor
 .serena
 
 **/node_modules
