@@ -83,6 +83,11 @@ const syntheticEnvironment = {
   AUTH_DATABASE_URL: "postgresql://auth:auth@127.0.0.1:1/smoke",
   BETTER_AUTH_SECRET:
     "synthetic-container-test-secret-that-is-never-used-for-real-auth",
+  NETLIFY_PROXY_SIGNING_SECRET:
+    "synthetic-container-proxy-secret-never-used-for-real-auth",
+  PROXY_EXPECTED_SITE_URL: "https://app.example.test",
+  PROXY_EXPECTED_NETLIFY_ID: "synthetic-container-test",
+  PROXY_EXPECTED_DEPLOY_CONTEXT: "production",
   GOOGLE_CLIENT_ID: "synthetic-client",
   GOOGLE_CLIENT_SECRET: "synthetic-client-secret",
   RESEND_API_KEY: "synthetic-resend-key",

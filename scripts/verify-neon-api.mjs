@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { randomBytes } from "node:crypto"
+import { createHmac, randomBytes } from "node:crypto"
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { createServer } from "node:net"
@@ -55,6 +55,10 @@ export function createCompiledApiEnvironment(environment, port) {
     WIDGET_ORIGIN: "https://widget.example.test",
     BETTER_AUTH_URL: "https://app.example.test",
     BETTER_AUTH_SECRET: randomBytes(48).toString("base64url"),
+    NETLIFY_PROXY_SIGNING_SECRET: randomBytes(48).toString("base64url"),
+    PROXY_EXPECTED_SITE_URL: "https://app.example.test",
+    PROXY_EXPECTED_NETLIFY_ID: "synthetic-api-acceptance",
+    PROXY_EXPECTED_DEPLOY_CONTEXT: "production",
     BETTER_AUTH_API_KEY: "",
     DATABASE_URL: environment.DATABASE_URL,
     AUTH_DATABASE_URL: environment.AUTH_DATABASE_URL,
@@ -173,8 +177,8 @@ process.channel?.unref()
   }
 }
 
-async function responseBody(response, stage) {
-  if (response.headers.get("cache-control") !== "no-store") fail(stage)
+async function responseBody(response, stage, cacheControl = "no-store") {
+  if (response.headers.get("cache-control") !== cacheControl) fail(stage)
   try {
     return await response.json()
   } catch {
@@ -197,7 +201,7 @@ export async function verifyApiEndpoints(
   baseUrl,
   fetchResponse = fetch,
   signal,
-  { childClosed = () => false, readinessOptions } = {}
+  { childClosed = () => false, readinessOptions, proxyEnvironment } = {}
 ) {
   for (const [path, status, expected, origin] of [
     ["/health/live", 200, { status: "ok" }],
@@ -227,8 +231,30 @@ export async function verifyApiEndpoints(
     const stage = path === "/api/v1/me" ? "owner-boundary" : path.slice(1)
     let response
     try {
+      const headers = origin ? { Origin: origin } : {}
+      if (path.startsWith("/api/") && proxyEnvironment) {
+        const head = Buffer.from(
+          JSON.stringify({ alg: "HS256", typ: "JWT" })
+        ).toString("base64url")
+        const claims = Buffer.from(
+          JSON.stringify({
+            iss: "netlify",
+            exp: Math.floor(Date.now() / 1000) + 60,
+            site_url: proxyEnvironment.PROXY_EXPECTED_SITE_URL,
+            netlify_id: proxyEnvironment.PROXY_EXPECTED_NETLIFY_ID,
+            deploy_context: proxyEnvironment.PROXY_EXPECTED_DEPLOY_CONTEXT,
+          })
+        ).toString("base64url")
+        const digest = createHmac(
+          "sha256",
+          proxyEnvironment.NETLIFY_PROXY_SIGNING_SECRET
+        )
+          .update(`${head}.${claims}`)
+          .digest("base64url")
+        headers["x-nf-sign"] = `${head}.${claims}.${digest}`
+      }
       response = await fetchResponse(`${baseUrl}${path}`, {
-        headers: origin ? { Origin: origin } : {},
+        headers,
         redirect: "error",
         signal: signal
           ? AbortSignal.any([signal, AbortSignal.timeout(5000)])
@@ -238,7 +264,13 @@ export async function verifyApiEndpoints(
       fail(stage)
     }
     if (response.status !== status) fail(stage)
-    const body = await responseBody(response, stage)
+    const body = await responseBody(
+      response,
+      stage,
+      path.startsWith("/api/") && proxyEnvironment
+        ? "private, no-store"
+        : "no-store"
+    )
     if (!sameFields(body, expected)) fail(stage)
   }
 }
@@ -482,6 +514,7 @@ export async function verifyCompiledApi(
     await verifyApiEndpoints(baseUrl, fetchResponse, cancellation.signal, {
       childClosed: () => closed,
       readinessOptions,
+      proxyEnvironment: childEnvironment,
     })
     if (closed) fail("unexpected-exit")
     if (platform === "win32") {

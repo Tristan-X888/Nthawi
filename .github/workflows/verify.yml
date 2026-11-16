@@ -58,6 +58,9 @@ jobs:
       - name: Check repository and package boundaries
         run: pnpm check:step3
 
+      - name: Verify staging ingress and deployment configuration contracts
+        run: node --test scripts/dev-signed-proxy.test.mjs scripts/staging-config.test.mjs scripts/staging-render.test.mjs
+
       - name: Verify local gate orchestration
         shell: pwsh
         run: ./scripts/verify-step4.test.ps1

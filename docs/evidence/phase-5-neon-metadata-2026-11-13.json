@@ -1,0 +1,111 @@
+{
+  "production": {
+    "observedUtc": "2026-11-13T07:53:43Z",
+    "project": {
+      "id": "delicate-feather-83629956",
+      "org_id": "org-wild-bird-68149107",
+      "region_id": "aws-eu-west-2",
+      "pg_version": 18,
+      "name": "Nthawi",
+      "history_retention_seconds": 604800,
+      "default_endpoint_settings": {
+        "autoscaling_limit_min_cu": 0.25,
+        "autoscaling_limit_max_cu": 8,
+        "suspend_timeout_seconds": 0
+      },
+      "owner": {
+        "subscription_type": "launch_v3"
+      }
+    },
+    "branches": [
+      {
+        "id": "br-lively-darkness-zahxet6z",
+        "project_id": "delicate-feather-83629956",
+        "name": "production",
+        "protected": true,
+        "current_state": "ready",
+        "default": true
+      },
+      {
+        "id": "br-rapid-brook-zao6uwya",
+        "project_id": "delicate-feather-83629956",
+        "name": "test/nthawi-database-bootstrap",
+        "protected": false,
+        "current_state": "ready",
+        "default": false
+      }
+    ],
+    "endpoints": [
+      {
+        "id": "ep-cold-shadow-zaqw3flo",
+        "project_id": "delicate-feather-83629956",
+        "branch_id": "br-rapid-brook-zao6uwya",
+        "host": "ep-cold-shadow-zaqw3flo.c-2.eu-west-2.aws.neon.tech",
+        "region_id": "aws-eu-west-2",
+        "type": "read_write",
+        "autoscaling_limit_min_cu": 0.25,
+        "autoscaling_limit_max_cu": 1,
+        "suspend_timeout_seconds": 300,
+        "disabled": false,
+        "current_state": "idle"
+      },
+      {
+        "id": "ep-wild-leaf-za09k0vy",
+        "project_id": "delicate-feather-83629956",
+        "branch_id": "br-lively-darkness-zahxet6z",
+        "host": "ep-wild-leaf-za09k0vy.c-2.eu-west-2.aws.neon.tech",
+        "region_id": "aws-eu-west-2",
+        "type": "read_write",
+        "autoscaling_limit_min_cu": 0.25,
+        "autoscaling_limit_max_cu": 1,
+        "suspend_timeout_seconds": -1,
+        "disabled": false,
+        "current_state": "active"
+      }
+    ]
+  },
+  "staging": {
+    "observedUtc": "2026-11-13T07:53:43Z",
+    "project": {
+      "id": "calm-math-03562419",
+      "org_id": "org-wild-bird-68149107",
+      "region_id": "aws-eu-west-2",
+      "pg_version": 18,
+      "name": "nthawi-staging",
+      "history_retention_seconds": 86400,
+      "default_endpoint_settings": {
+        "autoscaling_limit_min_cu": 0.25,
+        "autoscaling_limit_max_cu": 8,
+        "suspend_timeout_seconds": 0
+      },
+      "owner": {
+        "subscription_type": "launch_v3"
+      }
+    },
+    "branches": [
+      {
+        "id": "br-tiny-hall-za0rrr1l",
+        "project_id": "calm-math-03562419",
+        "name": "production",
+        "protected": false,
+        "current_state": "ready",
+        "default": true
+      }
+    ],
+    "endpoints": [
+      {
+        "id": "ep-super-frost-zawnips1",
+        "project_id": "calm-math-03562419",
+        "branch_id": "br-tiny-hall-za0rrr1l",
+        "host": "ep-super-frost-zawnips1.c-2.eu-west-2.aws.neon.tech",
+        "region_id": "aws-eu-west-2",
+        "type": "read_write",
+        "autoscaling_limit_min_cu": 0.25,
+        "autoscaling_limit_max_cu": 8,
+        "suspend_timeout_seconds": 0,
+        "disabled": false,
+        "current_state": "idle"
+      }
+    ]
+  }
+}

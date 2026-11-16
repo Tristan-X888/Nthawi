@@ -1,0 +1,30 @@
+# Staging marketing project only. No owner variables or auth rewrites.
+# Provider build_settings.stop_builds=true and no build hooks are required.
+[build]
+  base = "."
+  command = "pnpm install --frozen-lockfile && pnpm --filter @nthawi/marketing build"
+  publish = "apps/marketing/.next"
+  ignore = "exit 0"
+
+[build.environment]
+  NODE_VERSION = "24.21.0"
+  PNPM_VERSION = "10.16.1"
+
+[functions]
+  region = "fra"
+
+# Dynamic Next.js headers and hash/nonce CSP require adapter conformance.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "max-age=0, must-revalidate"
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

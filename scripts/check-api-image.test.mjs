@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { readFile } from "node:fs/promises"
 
 import {
   cleanupTestContainers,
@@ -7,6 +8,15 @@ import {
 } from "./check-api-image.mjs"
 
 const names = ["nthawi-step3-test", "nthawi-step3-invalid-test"]
+
+test("Docker build context excludes preserved private plugin state", async () => {
+  const patterns = (
+    await readFile(new URL("../.dockerignore", import.meta.url), "utf8")
+  )
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+  assert.ok(patterns.includes(".anchor") || patterns.includes("**/.anchor"))
+})
 
 function healthFetch(liveStatus = 200, readyStatus = 503, cache = "no-store") {
   return async (url, options) => {

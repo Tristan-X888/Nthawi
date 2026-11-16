@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { EventEmitter } from "node:events"
+import { createHmac } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import test from "node:test"
@@ -43,7 +44,11 @@ function environment() {
 function responses(url, options) {
   assert.ok(options.signal instanceof AbortSignal)
   assert.equal(options.redirect, "error")
-  const headers = { "Cache-Control": "no-store" }
+  const headers = {
+    "Cache-Control": options.headers?.["x-nf-sign"]
+      ? "private, no-store"
+      : "no-store",
+  }
   if (url.endsWith("/health/live")) {
     return Response.json({ status: "ok" }, { headers })
   }
@@ -57,7 +62,8 @@ function responses(url, options) {
       { status: 403, headers }
     )
   }
-  assert.deepEqual(options.headers, {})
+  const { "x-nf-sign": _signature, ...requestHeaders } = options.headers ?? {}
+  assert.deepEqual(requestHeaders, {})
   return Response.json(
     { code: "UNAUTHORIZED", message: "A valid owner session is required." },
     { status: 401, headers }
@@ -138,6 +144,10 @@ test("child receives approved runtime URLs and synthetic auth, with no operator 
   assert.equal(result.BETTER_AUTH_API_KEY, "")
   assert.equal(result.WEB_ORIGIN, result.BETTER_AUTH_URL)
   assert.ok(result.BETTER_AUTH_SECRET.length >= 32)
+  assert.ok(result.NETLIFY_PROXY_SIGNING_SECRET?.length >= 32)
+  assert.equal(result.PROXY_EXPECTED_SITE_URL, result.WEB_ORIGIN)
+  assert.equal(result.PROXY_EXPECTED_DEPLOY_CONTEXT, "production")
+  assert.equal(result.PROXY_EXPECTED_NETLIFY_ID, "synthetic-api-acceptance")
   for (const name of [
     "DATABASE_MIGRATION_URL",
     "JOBS_DATABASE_URL",
@@ -156,6 +166,63 @@ test("child receives approved runtime URLs and synthetic auth, with no operator 
     result.BETTER_AUTH_SECRET,
     createNeonApiEnvironment(values, 41234).BETTER_AUTH_SECRET
   )
+})
+
+test("compiled acceptance signs owner probes while health remains independent", async () => {
+  const proxyEnvironment = {
+    NETLIFY_PROXY_SIGNING_SECRET:
+      "synthetic-probe-secret-longer-than-32-characters",
+    PROXY_EXPECTED_SITE_URL: "https://app.example.test",
+    PROXY_EXPECTED_NETLIFY_ID: "synthetic-api-acceptance",
+    PROXY_EXPECTED_DEPLOY_CONTEXT: "production",
+  }
+  await verifyApiEndpoints(
+    "http://127.0.0.1:41234",
+    (url, options) => {
+      const signature = options.headers?.["x-nf-sign"]
+      if (url.includes("/api/")) {
+        assert.equal(typeof signature, "string")
+        const [head, payload, digest] = signature.split(".")
+        assert.equal(
+          digest,
+          createHmac("sha256", proxyEnvironment.NETLIFY_PROXY_SIGNING_SECRET)
+            .update(`${head}.${payload}`)
+            .digest("base64url")
+        )
+        const claims = JSON.parse(Buffer.from(payload, "base64url"))
+        assert.equal(claims.iss, "netlify")
+        assert.equal(claims.site_url, "https://app.example.test")
+        assert.equal(claims.netlify_id, "synthetic-api-acceptance")
+        assert.equal(claims.deploy_context, "production")
+        assert.ok(claims.exp > Date.now() / 1000)
+      } else {
+        assert.equal(signature, undefined)
+      }
+      return responses(url, options)
+    },
+    undefined,
+    { proxyEnvironment }
+  )
+})
+
+test("signed owner acceptance rejects caching policies that omit either privacy or no-store", async () => {
+  const proxyEnvironment = createNeonApiEnvironment(environment(), 41234)
+  for (const cache of ["no-store", "private", "public, max-age=60"]) {
+    await assert.rejects(
+      verifyApiEndpoints(
+        "http://127.0.0.1:41234",
+        (url, options) => {
+          const response = responses(url, options)
+          if (url.includes("/api/"))
+            response.headers.set("cache-control", cache)
+          return response
+        },
+        undefined,
+        { proxyEnvironment }
+      ),
+      { stage: "owner-boundary" }
+    )
+  }
 })
 
 test("production, wrong branches, and any invalid role fail before all side effects", async () => {
@@ -249,16 +316,16 @@ test("Windows labels hook invocation over IPC without claiming an OS-signal test
   assert.ok(!fixture.calls.includes("SIGTERM"))
 })
 
-test("actual compiled production startup and shutdown run without contacting a database", async () => {
+test("actual compiled production owner boundary, startup and shutdown run without contacting a database", async () => {
   // Only liveness uses the real local HTTP listener. Readiness and owner bodies
   // are supplied here so this lifecycle test never opens the approved remote
   // database; the operator gate uses real responses for every endpoint.
   const result = await verifyNeonApi(environment(), {
     prepare: () => prepareCompiledApi({ preventDatabaseConnections: true }),
     fetchResponse: (url, options) =>
-      url.endsWith("/health/live")
-        ? fetch(url, options)
-        : responses(url, options),
+      url.endsWith("/health/ready")
+        ? responses(url, options)
+        : fetch(url, options),
   })
   assert.deepEqual(result, {
     shutdownMode:

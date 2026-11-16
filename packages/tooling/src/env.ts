@@ -56,6 +56,21 @@ const optionalSecret = z.preprocess(
   required.optional()
 )
 
+/** Canonical hosted owner surfaces remain protected even if NODE_ENV is wrong. */
+export function isDeployedOwnerEnvironment(env: {
+  NODE_ENV?: string
+  WEB_ORIGIN: string
+}): boolean {
+  if (env.NODE_ENV === "production") return true
+  try {
+    return ["app-staging.nthawi.io", "app.nthawi.io"].includes(
+      new URL(env.WEB_ORIGIN).hostname
+    )
+  } catch {
+    return false
+  }
+}
+
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z
@@ -66,6 +81,21 @@ export const serverEnvSchema = z
     WIDGET_ORIGIN: origin,
     API_PORT: z.coerce.number().int().positive().max(65535).default(4000),
     API_TRUST_PROXY: trustedProxies,
+    // Phase 5: Netlify signed owner ingress. Deployed staging uses production.
+    NETLIFY_PROXY_SIGNING_SECRET: optionalSecret,
+    NETLIFY_PROXY_PREVIOUS_SIGNING_SECRET: optionalSecret,
+    // Unix epoch seconds. A retiring key is accepted for at most one hour.
+    PROXY_PREVIOUS_KEY_VALID_UNTIL: z.coerce
+      .number()
+      .int()
+      .positive()
+      .safe()
+      .optional(),
+    PROXY_EXPECTED_SITE_URL: origin.optional(),
+    PROXY_EXPECTED_NETLIFY_ID: required.optional(),
+    PROXY_EXPECTED_DEPLOY_CONTEXT: z
+      .enum(["production", "deploy-preview", "branch-deploy", "dev"])
+      .optional(),
     DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     AUTH_DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
     BETTER_AUTH_SECRET: z
@@ -96,7 +126,65 @@ export const serverEnvSchema = z
     MAX_WEBSITE_SOURCES: z.coerce.number().int().positive().default(10),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV !== "production") return
+    const deployedOwner = isDeployedOwnerEnvironment(env)
+    const proxyFields = [
+      "NETLIFY_PROXY_SIGNING_SECRET",
+      "PROXY_EXPECTED_SITE_URL",
+      "PROXY_EXPECTED_NETLIFY_ID",
+      "PROXY_EXPECTED_DEPLOY_CONTEXT",
+    ] as const
+    const proxyRequired =
+      deployedOwner ||
+      proxyFields.some((field) => env[field] !== undefined) ||
+      env.NETLIFY_PROXY_PREVIOUS_SIGNING_SECRET !== undefined ||
+      env.PROXY_PREVIOUS_KEY_VALID_UNTIL !== undefined
+    if (proxyRequired) {
+      for (const field of proxyFields) {
+        if (env[field] === undefined) {
+          ctx.addIssue({
+            code: "custom",
+            path: [field],
+            message: "Required for signed ingress.",
+          })
+        }
+      }
+      if ((env.NETLIFY_PROXY_SIGNING_SECRET?.trim().length ?? 0) < 32) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["NETLIFY_PROXY_SIGNING_SECRET"],
+          message:
+            "Signing secret must contain at least 32 nonblank characters.",
+        })
+      }
+    }
+    const previousSecret = env.NETLIFY_PROXY_PREVIOUS_SIGNING_SECRET
+    const previousUntil = env.PROXY_PREVIOUS_KEY_VALID_UNTIL
+    if (previousSecret !== undefined || previousUntil !== undefined) {
+      if (
+        previousSecret === undefined ||
+        previousSecret.trim().length < 32 ||
+        previousSecret === env.NETLIFY_PROXY_SIGNING_SECRET
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["NETLIFY_PROXY_PREVIOUS_SIGNING_SECRET"],
+          message:
+            "A distinct retiring signing secret of at least 32 characters is required.",
+        })
+      }
+      if (
+        previousUntil === undefined ||
+        previousUntil > Math.floor(Date.now() / 1000) + 3600
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["PROXY_PREVIOUS_KEY_VALID_UNTIL"],
+          message:
+            "An explicit retiring-key cutoff no more than one hour ahead is required.",
+        })
+      }
+    }
+    if (!deployedOwner) return
 
     const validateDeployedOrigin = (
       value: string,
@@ -138,6 +226,11 @@ export const serverEnvSchema = z
       "WIDGET_ORIGIN",
     ])
     validateDeployedOrigin(env.BETTER_AUTH_URL, ["BETTER_AUTH_URL"])
+    if (env.PROXY_EXPECTED_SITE_URL !== undefined) {
+      validateDeployedOrigin(env.PROXY_EXPECTED_SITE_URL, [
+        "PROXY_EXPECTED_SITE_URL",
+      ])
+    }
 
     env.AUTH_TRUSTED_ORIGINS.forEach((value, index) => {
       const hostname = validateDeployedOrigin(value, [

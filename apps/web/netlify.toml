@@ -1,0 +1,54 @@
+# Staging owner project only. Base directory is the repository root.
+# Keep provider build_settings.stop_builds=true; do not create build hooks.
+# ignore is defense in depth only: Netlify build hooks bypass ignore commands.
+# Approved operator builds/deploys use the local Netlify CLI while builds stop.
+[build]
+  base = "."
+  command = "pnpm install --frozen-lockfile && pnpm --filter @nthawi/web build"
+  publish = "apps/web/.next"
+  ignore = "exit 0"
+
+[build.environment]
+  NODE_VERSION = "24.21.0"
+  PNPM_VERSION = "10.16.1"
+  NEXT_PUBLIC_API_URL = "https://app-staging.nthawi.io"
+
+[functions]
+  region = "fra"
+
+[[redirects]]
+  from = "/api/auth/*"
+  to = "https://api-staging.nthawi.io/api/auth/:splat"
+  status = 200
+  force = true
+  signed = "NETLIFY_PROXY_SIGNING_SECRET"
+
+[[redirects]]
+  from = "/api/v1/*"
+  to = "https://api-staging.nthawi.io/api/v1/:splat"
+  status = 200
+  force = true
+  signed = "NETLIFY_PROXY_SIGNING_SECRET"
+
+# Headers here cover static responses. Next.js and API handlers must emit
+# their own dynamic/cache/CSP headers; actual HTTPS conformance remains a gate.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "private, no-store"
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "private, no-store"
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
