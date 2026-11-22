@@ -25,16 +25,40 @@ export type Allowance = { label: string; value: string; note?: string }
 
 /** v0.3 purchased allowances: owner-wide, shared by all workspaces. */
 export const allowances: readonly Allowance[] = [
-  { label: "Active workspaces", value: "2", note: "One per website you want answered." },
-  { label: "Knowledge sources", value: "100", note: "Each imported web page or uploaded file is one source." },
-  { label: "Knowledge storage", value: "1 GiB", note: "Originals, extracted text and search data." },
-  { label: "Versions kept per source", value: "3", note: "Including the published version." },
+  {
+    label: "Active workspaces",
+    value: "2",
+    note: "One per website you want answered.",
+  },
+  {
+    label: "Knowledge sources",
+    value: "100",
+    note: "Each imported web page or uploaded file is one source.",
+  },
+  {
+    label: "Knowledge storage",
+    value: "1 GiB",
+    note: "Originals, extracted text and search data.",
+  },
+  {
+    label: "Versions kept per source",
+    value: "3",
+    note: "Including the published version.",
+  },
   { label: "Largest file", value: "10 MiB", note: "Per uploaded document." },
 ]
 
 export const termAllowances: readonly Allowance[] = [
-  { label: "AI answers", value: "1,000", note: "In previews, the widget and the API alike." },
-  { label: "Conversation messages", value: "10,000", note: "From visitors, you and Nthawi." },
+  {
+    label: "AI answers",
+    value: "1,000",
+    note: "In previews, the widget and the API alike.",
+  },
+  {
+    label: "Conversation messages",
+    value: "10,000",
+    note: "From visitors, you and Nthawi.",
+  },
   { label: "Knowledge imports and refreshes", value: "100" },
   { label: "API requests", value: "25,000", note: "At most 60 per minute." },
   { label: "Knowledge processing", value: "5,000,000 tokens" },

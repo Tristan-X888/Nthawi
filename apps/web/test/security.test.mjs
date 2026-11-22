@@ -45,8 +45,15 @@ test("return paths reject non-strings", () => {
 })
 
 test("owner CSP is nonce-based, strict-dynamic and frame-denying", () => {
-  const csp = buildOwnerCsp({ nonce: "abcdefghijklmnop0123", development: false, https: true })
-  assert.match(csp, /script-src 'self' 'nonce-abcdefghijklmnop0123' 'strict-dynamic'(;|$)/)
+  const csp = buildOwnerCsp({
+    nonce: "abcdefghijklmnop0123",
+    development: false,
+    https: true,
+  })
+  assert.match(
+    csp,
+    /script-src 'self' 'nonce-abcdefghijklmnop0123' 'strict-dynamic'(;|$)/
+  )
   assert.match(csp, /frame-ancestors 'none'/)
   assert.match(csp, /object-src 'none'/)
   assert.match(csp, /base-uri 'none'/)
@@ -56,7 +63,11 @@ test("owner CSP is nonce-based, strict-dynamic and frame-denying", () => {
 })
 
 test("development CSP adds only eval and HMR sockets", () => {
-  const csp = buildOwnerCsp({ nonce: "abcdefghijklmnop0123", development: true, https: false })
+  const csp = buildOwnerCsp({
+    nonce: "abcdefghijklmnop0123",
+    development: true,
+    https: false,
+  })
   assert.match(csp, /'unsafe-eval'/)
   assert.match(csp, /connect-src 'self' ws: wss:/)
   assert.doesNotMatch(csp, /upgrade-insecure-requests/)
@@ -64,7 +75,12 @@ test("development CSP adds only eval and HMR sockets", () => {
 
 test("CSP refuses a malformed nonce (header injection guard)", () => {
   assert.throws(
-    () => buildOwnerCsp({ nonce: "x'; script-src *", development: false, https: true }),
+    () =>
+      buildOwnerCsp({
+        nonce: "x'; script-src *",
+        development: false,
+        https: true,
+      }),
     /CSP_NONCE_INVALID/
   )
 })

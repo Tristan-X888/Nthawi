@@ -24,11 +24,13 @@ const types = {
 
 function siteHeaders() {
   const file = join(root, "_headers")
-  if (!existsSync(file)) throw new Error("Run the marketing build first: out/_headers is missing.")
+  if (!existsSync(file))
+    throw new Error("Run the marketing build first: out/_headers is missing.")
   const headers = {}
   for (const line of readFileSync(file, "utf8").split("\n").slice(1)) {
     const index = line.indexOf(":")
-    if (index > 0) headers[line.slice(0, index).trim()] = line.slice(index + 1).trim()
+    if (index > 0)
+      headers[line.slice(0, index).trim()] = line.slice(index + 1).trim()
   }
   return headers
 }

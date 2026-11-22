@@ -9,7 +9,12 @@ export default [
     // Build, preview and test scripts run in Node.js.
     files: ["scripts/**/*.mjs", "e2e/**/*.mjs", "test/**/*.mjs"],
     languageOptions: {
-      globals: { process: "readonly", console: "readonly", URL: "readonly", Buffer: "readonly" },
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        Buffer: "readonly",
+      },
     },
   },
   {

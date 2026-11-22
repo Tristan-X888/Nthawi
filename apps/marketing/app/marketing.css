@@ -18,9 +18,21 @@
   inset: -25%;
   z-index: -2;
   background:
-    radial-gradient(38% 34% at 74% 34%, color-mix(in oklch, var(--brand) 42%, transparent), transparent 72%),
-    radial-gradient(30% 28% at 88% 78%, oklch(0.42 0.08 210 / 0.38), transparent 70%),
-    radial-gradient(26% 24% at 18% 92%, color-mix(in oklch, var(--brand) 18%, transparent), transparent 70%);
+    radial-gradient(
+      38% 34% at 74% 34%,
+      color-mix(in oklch, var(--brand) 42%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      30% 28% at 88% 78%,
+      oklch(0.42 0.08 210 / 0.38),
+      transparent 70%
+    ),
+    radial-gradient(
+      26% 24% at 18% 92%,
+      color-mix(in oklch, var(--brand) 18%, transparent),
+      transparent 70%
+    );
   filter: blur(28px);
   animation: var(--animate-drift);
 }
@@ -30,10 +42,22 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-image: radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.1) 1px, transparent 0);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    oklch(1 0 0 / 0.1) 1px,
+    transparent 0
+  );
   background-size: 24px 24px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 68% 40%, #000 30%, transparent 100%);
-  mask-image: radial-gradient(ellipse 70% 65% at 68% 40%, #000 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 65% at 68% 40%,
+    #000 30%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 65% at 68% 40%,
+    #000 30%,
+    transparent 100%
+  );
 }
 
 /* The conversation figure enters once, in reading order (the one motion moment). */

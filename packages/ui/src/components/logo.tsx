@@ -14,7 +14,13 @@ function LogoMark({ className }: { className?: string }) {
       focusable="false"
       className={cn("size-8 shrink-0", className)}
     >
-      <circle cx="16" cy="14.5" r="11" stroke="currentColor" strokeWidth="2.5" />
+      <circle
+        cx="16"
+        cy="14.5"
+        r="11"
+        stroke="currentColor"
+        strokeWidth="2.5"
+      />
       <path
         d="M8.6 22.6 6 28.5l6.1-2.7"
         stroke="currentColor"
@@ -40,7 +46,12 @@ function Logo({
   wordmark?: boolean
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-2 text-foreground", className)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 text-foreground",
+        className
+      )}
+    >
       <LogoMark />
       {wordmark ? (
         <span className="font-heading text-xl leading-none font-semibold tracking-tight">

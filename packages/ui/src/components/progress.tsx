@@ -65,7 +65,14 @@ function ProgressRing({
       className={cn("relative inline-grid place-items-center", className)}
     >
       <svg viewBox="0 0 56 56" width={size} height={size} aria-hidden="true">
-        <circle cx="28" cy="28" r={radius} fill="none" strokeWidth="5" className="stroke-muted" />
+        <circle
+          cx="28"
+          cy="28"
+          r={radius}
+          fill="none"
+          strokeWidth="5"
+          className="stroke-muted"
+        />
         <circle
           cx="28"
           cy="28"
@@ -79,7 +86,10 @@ function ProgressRing({
           className="stroke-primary"
         />
       </svg>
-      <span aria-hidden="true" className="absolute text-xs font-semibold tabular-nums">
+      <span
+        aria-hidden="true"
+        className="absolute text-xs font-semibold tabular-nums"
+      >
         {percent}%
       </span>
     </div>

@@ -12,21 +12,43 @@ import { SiteHeader } from "@/components/site-header"
 import { ThemeProvider } from "@/components/theme-provider"
 import { indexable, siteEnv, siteOrigin } from "@/lib/site"
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" })
-const lora = Lora({ subsets: ["latin"], variable: "--font-lora", display: "swap" })
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" })
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+})
+const lora = Lora({
+  subsets: ["latin"],
+  variable: "--font-lora",
+  display: "swap",
+})
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+  display: "swap",
+})
 
 const description =
   "Nthawi answers questions on your website from the pages and files you review and publish, cites its sources, and lets you take over at any time."
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
-  title: { default: "Nthawi: website answers from knowledge you approve", template: "%s | Nthawi" },
+  title: {
+    default: "Nthawi: website answers from knowledge you approve",
+    template: "%s | Nthawi",
+  },
   description,
-  robots: indexable ? { index: true, follow: true } : { index: false, follow: false },
+  robots: indexable
+    ? { index: true, follow: true }
+    : { index: false, follow: false },
   ...(indexable
     ? {
-        openGraph: { type: "website", siteName: "Nthawi", url: siteOrigin, description },
+        openGraph: {
+          type: "website",
+          siteName: "Nthawi",
+          url: siteOrigin,
+          description,
+        },
       }
     : {}),
 }
@@ -38,7 +60,9 @@ export const viewport: Viewport = {
   ],
 }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"

@@ -16,7 +16,10 @@ import { Icon } from "@workspace/ui/components/icon"
 import { PageHeader } from "@workspace/ui/components/page-header"
 import { ProgressBar, ProgressRing } from "@workspace/ui/components/progress"
 import { LoadingRegion, Skeleton } from "@workspace/ui/components/skeleton"
-import { SidebarCallout, type NavSection } from "@workspace/ui/components/sidebar"
+import {
+  SidebarCallout,
+  type NavSection,
+} from "@workspace/ui/components/sidebar"
 import { Spinner } from "@workspace/ui/components/spinner"
 import { EmptyState, ErrorState } from "@workspace/ui/components/state"
 import { ThemeSelector } from "@workspace/ui/components/theme-selector"
@@ -31,8 +34,19 @@ const sections: NavSection[] = [
     id: "workspace",
     label: "Workspace",
     items: [
-      { id: "overview", label: "Overview", href: "/catalogue", icon: "dashboard" },
-      { id: "knowledge", label: "Knowledge", href: "/catalogue/knowledge", icon: "knowledge", unavailable: true },
+      {
+        id: "overview",
+        label: "Overview",
+        href: "/catalogue",
+        icon: "dashboard",
+      },
+      {
+        id: "knowledge",
+        label: "Knowledge",
+        href: "/catalogue/knowledge",
+        icon: "knowledge",
+        unavailable: true,
+      },
       {
         id: "conversations",
         label: "Conversations",
@@ -52,9 +66,21 @@ const sections: NavSection[] = [
         href: "/catalogue/settings",
         icon: "settings",
         children: [
-          { id: "profile", label: "Profile", href: "/catalogue/settings/profile" },
-          { id: "security", label: "Security", href: "/catalogue/settings/security" },
-          { id: "sessions", label: "Sessions", href: "/catalogue/settings/sessions" },
+          {
+            id: "profile",
+            label: "Profile",
+            href: "/catalogue/settings/profile",
+          },
+          {
+            id: "security",
+            label: "Security",
+            href: "/catalogue/settings/security",
+          },
+          {
+            id: "sessions",
+            label: "Sessions",
+            href: "/catalogue/settings/sessions",
+          },
         ],
       },
       { id: "help", label: "Help", href: "/catalogue/help", icon: "help" },
@@ -64,11 +90,29 @@ const sections: NavSection[] = [
 
 const mobilePrimary = [
   { id: "overview", label: "Overview", href: "/catalogue", icon: "dashboard" },
-  { id: "conversations", label: "Inbox", href: "/catalogue/conversations", icon: "inbox" },
-  { id: "settings", label: "Settings", href: "/catalogue/settings", icon: "settings" },
+  {
+    id: "conversations",
+    label: "Inbox",
+    href: "/catalogue/conversations",
+    icon: "inbox",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    href: "/catalogue/settings",
+    icon: "settings",
+  },
 ] as const
 
-function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: string
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <section aria-labelledby={id} className="flex flex-col gap-4 border-t pt-8">
       <h2 id={id} className="text-2xl font-semibold">
@@ -85,7 +129,12 @@ export default function CataloguePage() {
       sections={sections}
       mobilePrimary={mobilePrimary}
       breadcrumbs={
-        <Breadcrumbs items={[{ label: "Catalogue", href: "/catalogue" }, { label: "Foundation" }]} />
+        <Breadcrumbs
+          items={[
+            { label: "Catalogue", href: "/catalogue" },
+            { label: "Foundation" },
+          ]}
+        />
       }
       topbarEnd={<ThemeSelector compact />}
       sidebarFooter={
@@ -94,7 +143,9 @@ export default function CataloguePage() {
             <ProgressRing label="Setup progress" value={40} />
             <p className="text-sm font-semibold">Finish setup</p>
           </div>
-          <p className="text-xs text-muted-foreground">2 of 5 setup steps done.</p>
+          <p className="text-xs text-muted-foreground">
+            2 of 5 setup steps done.
+          </p>
           <Button size="sm" width="full">
             Continue setup
           </Button>
@@ -163,13 +214,25 @@ export default function CataloguePage() {
             <CountBadge count={12} label="unread conversations" />
           </div>
           <div className="grid max-w-md gap-6">
-            <ProgressBar label="Active workspaces" value={1} max={2} valueText="1 of 2" />
-            <ProgressRing label="Setup progress" value={60} className="justify-self-start" />
+            <ProgressBar
+              label="Active workspaces"
+              value={1}
+              max={2}
+              valueText="1 of 2"
+            />
+            <ProgressRing
+              label="Setup progress"
+              value={60}
+              className="justify-self-start"
+            />
           </div>
         </Section>
 
         <Section id="loading" title="Loading">
-          <LoadingRegion label="Loading workspaces" className="grid gap-4 md:grid-cols-3">
+          <LoadingRegion
+            label="Loading workspaces"
+            className="grid gap-4 md:grid-cols-3"
+          >
             <Skeleton className="h-28 rounded-xl" />
             <Skeleton className="h-28 rounded-xl" />
             <Skeleton className="h-28 rounded-xl" />
@@ -185,15 +248,30 @@ export default function CataloguePage() {
                   <Icon name="usage" className="text-link" /> Usage this term
                 </CardTitle>
                 <CardAction>
-                  <a href="#usage" className="text-sm font-medium text-link underline-offset-4 hover:underline">
+                  <a
+                    href="#usage"
+                    className="text-sm font-medium text-link underline-offset-4 hover:underline"
+                  >
                     View all
                   </a>
                 </CardAction>
-                <CardDescription>Allowances shared by all workspaces.</CardDescription>
+                <CardDescription>
+                  Allowances shared by all workspaces.
+                </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                <ProgressBar label="AI answers" value={0} max={1000} valueText="0 of 1,000" />
-                <ProgressBar label="Conversation messages" value={0} max={10000} valueText="0 of 10,000" />
+                <ProgressBar
+                  label="AI answers"
+                  value={0}
+                  max={1000}
+                  valueText="0 of 1,000"
+                />
+                <ProgressBar
+                  label="Conversation messages"
+                  value={0}
+                  max={10000}
+                  valueText="0 of 10,000"
+                />
               </CardContent>
             </Card>
             <EmptyState

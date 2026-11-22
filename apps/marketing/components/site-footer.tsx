@@ -35,7 +35,11 @@ export function SiteFooter() {
           <ThemeSelector compact />
         </div>
         {groups.map((group) => (
-          <nav key={group.title} aria-label={group.title} className="flex flex-col gap-3 md:col-span-3">
+          <nav
+            key={group.title}
+            aria-label={group.title}
+            className="flex flex-col gap-3 md:col-span-3"
+          >
             <h2 className="font-sans text-sm font-semibold">{group.title}</h2>
             <ul className="flex flex-col gap-2">
               {group.links.map((link) => (

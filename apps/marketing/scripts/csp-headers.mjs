@@ -12,7 +12,12 @@ import { pathToFileURL } from "node:url"
  * is served at arbitrary paths).
  */
 
-const executableTypes = new Set(["", "text/javascript", "application/javascript", "module"])
+const executableTypes = new Set([
+  "",
+  "text/javascript",
+  "application/javascript",
+  "module",
+])
 
 const hash = (text) =>
   `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`
@@ -21,10 +26,14 @@ const hash = (text) =>
 export function collectInlineSources(html) {
   const scripts = []
   const styles = []
-  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  for (const match of html.matchAll(
+    /<script\b([^>]*)>([\s\S]*?)<\/script>/gi
+  )) {
     const attributes = match[1] ?? ""
     if (/\ssrc\s*=/i.test(attributes)) continue
-    const type = (/\stype\s*=\s*["']?([^"'\s>]+)/i.exec(attributes)?.[1] ?? "").toLowerCase()
+    const type = (
+      /\stype\s*=\s*["']?([^"'\s>]+)/i.exec(attributes)?.[1] ?? ""
+    ).toLowerCase()
     if (!executableTypes.has(type)) continue
     const value = hash(match[2] ?? "")
     if (!scripts.includes(value)) scripts.push(value)
@@ -75,12 +84,18 @@ export function writeHeadersFile(outDir, { https }) {
   const combined = { scripts: [], styles: [], styleAttributes: false }
   for (const page of pages) {
     const sources = collectInlineSources(readFileSync(page, "utf8"))
-    for (const value of sources.scripts) if (!combined.scripts.includes(value)) combined.scripts.push(value)
-    for (const value of sources.styles) if (!combined.styles.includes(value)) combined.styles.push(value)
+    for (const value of sources.scripts)
+      if (!combined.scripts.includes(value)) combined.scripts.push(value)
+    for (const value of sources.styles)
+      if (!combined.styles.includes(value)) combined.styles.push(value)
     combined.styleAttributes ||= sources.styleAttributes
   }
   const csp = buildMarketingCsp({ ...combined, https })
-  writeFileSync(join(outDir, "_headers"), `/*\n  Content-Security-Policy: ${csp}\n`, "utf8")
+  writeFileSync(
+    join(outDir, "_headers"),
+    `/*\n  Content-Security-Policy: ${csp}\n`,
+    "utf8"
+  )
   return {
     pages: pages.length,
     scriptHashes: combined.scripts.length,
@@ -90,10 +105,15 @@ export function writeHeadersFile(outDir, { https }) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
   const outDir = resolve(process.argv[2] ?? "out")
   // Local previews run on http://127.0.0.1; deployed staging/production use HTTPS.
-  const https = ["staging", "production"].includes(process.env.NEXT_PUBLIC_SITE_ENV ?? "")
+  const https = ["staging", "production"].includes(
+    process.env.NEXT_PUBLIC_SITE_ENV ?? ""
+  )
   const summary = writeHeadersFile(outDir, { https })
   console.log(
     `Marketing CSP: ${summary.pages} pages, ${summary.scriptHashes} script hashes, ${summary.styleHashes} style hashes, style attributes ${summary.styleAttributes ? "allowed" : "blocked"}, ${summary.bytes} bytes.`

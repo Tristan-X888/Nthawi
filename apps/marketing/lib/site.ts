@@ -10,7 +10,10 @@ export const siteEnv: SiteEnv =
 
 const origins: Record<SiteEnv, { site: string; app: string }> = {
   local: { site: "http://127.0.0.1:3610", app: "http://127.0.0.1:3600" },
-  staging: { site: "https://staging.nthawi.io", app: "https://app-staging.nthawi.io" },
+  staging: {
+    site: "https://staging.nthawi.io",
+    app: "https://app-staging.nthawi.io",
+  },
   production: { site: "https://www.nthawi.io", app: "https://app.nthawi.io" },
 }
 

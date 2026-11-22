@@ -18,7 +18,11 @@ export default function RouteError({
   reset: () => void
 }) {
   return (
-    <main id="main" tabIndex={-1} className="mx-auto w-full max-w-xl px-4 py-12 outline-none">
+    <main
+      id="main"
+      tabIndex={-1}
+      className="mx-auto w-full max-w-xl px-4 py-12 outline-none"
+    >
       <ErrorState
         headingLevel={1}
         title={copy.error.title}

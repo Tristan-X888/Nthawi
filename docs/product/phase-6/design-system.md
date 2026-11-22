@@ -13,15 +13,15 @@ this document in the same change.
 
 ## 1. Sources and decisions
 
-| Input | How it is used |
-| --- | --- |
-| Owner theme (teal hue 184.2, Geist, Lora; radius 0.75rem app, 0.5rem landing) | Adopted verbatim except the AA corrections in section 3. The two supplied themes differ only in `--radius`, implemented as `[data-surface="marketing"]`. |
-| Second pasted summary (blue-cyan hue 224.6, Bitter headings) | **Not applied.** It contradicts the explicit CSS in the Phase 6 prompt. Owner decision requested (agent.md, D-UI-1). |
-| Reference images (sidebar structure, spacing, secondary level, calls to action, dashboard structure, widgets, charts, grid, F-pattern, forms, settings, personalisation) | Section 9 (sidebar), section 10 (page anatomy and dashboards), section 11 (forms), section 12 (settings). |
-| Uiverse form (JohnnyCSilva) | Anatomy only: label above, icon input group, full-width primary, outlined social button. Hex colours, the fixed 450 px width and off-grid sizes were mapped to tokens. |
-| withanimation.app | SwiftUI motion reference only (cannot run on the web). Section 6. |
-| Uilora dark-matter hero, breadcrumbs, skeletons; Iconly Pro | Paid or unpublished licence terms. **Original token-based equivalents** were built; licensed assets can replace them later (section 7) after G-08 and owner approval. |
-| framer-motion / motion | **Not added** (standing owner decision 2026-11-06: no new npm packages; also conflicts with the strict CSP's style rules). CSS motion and skeletons cover the brief. |
+| Input                                                                                                                                                                    | How it is used                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner theme (teal hue 184.2, Geist, Lora; radius 0.75rem app, 0.5rem landing)                                                                                            | Adopted verbatim except the AA corrections in section 3. The two supplied themes differ only in `--radius`, implemented as `[data-surface="marketing"]`.               |
+| Second pasted summary (blue-cyan hue 224.6, Bitter headings)                                                                                                             | **Not applied.** It contradicts the explicit CSS in the Phase 6 prompt. Owner decision requested (agent.md, D-UI-1).                                                   |
+| Reference images (sidebar structure, spacing, secondary level, calls to action, dashboard structure, widgets, charts, grid, F-pattern, forms, settings, personalisation) | Section 9 (sidebar), section 10 (page anatomy and dashboards), section 11 (forms), section 12 (settings).                                                              |
+| Uiverse form (JohnnyCSilva)                                                                                                                                              | Anatomy only: label above, icon input group, full-width primary, outlined social button. Hex colours, the fixed 450 px width and off-grid sizes were mapped to tokens. |
+| withanimation.app                                                                                                                                                        | SwiftUI motion reference only (cannot run on the web). Section 6.                                                                                                      |
+| Uilora dark-matter hero, breadcrumbs, skeletons; Iconly Pro                                                                                                              | Paid or unpublished licence terms. **Original token-based equivalents** were built; licensed assets can replace them later (section 7) after G-08 and owner approval.  |
+| framer-motion / motion                                                                                                                                                   | **Not added** (standing owner decision 2026-11-06: no new npm packages; also conflicts with the strict CSP's style rules). CSS motion and skeletons cover the brief.   |
 
 ## 2. Principles
 
@@ -49,16 +49,16 @@ with `class="dark"` also renders dark, which the always-dark hero uses).
 
 AA corrections (measured by `packages/ui/test/contrast.test.mjs`):
 
-| Token | Supplied | Shipped | Reason |
-| --- | --- | --- | --- |
-| `--primary` (light, dark) | `oklch(0.605 0.107 184.2)` | `oklch(0.52 0.107 184.2)` | White label was 3.67:1; now 5.09:1 (needs 4.5). |
-| `--link` (new) | (primary) | light `0.52`, dark `0.685` | Text links need 4.5:1 on their surface. |
-| `--ring` (light) | `0.605 / 0.9` | `0.52` solid | A solid ring keeps 3:1 on every surface. |
-| `--input` | light `0.925`, dark `0.29` | light `0.66`, dark `0.50` | Input boundaries were 1.25:1 / 1.40:1; now 3.10:1 / 3.29:1. |
-| `--sidebar-primary` (light) | `0.605` | `0.52` | Active item carries white text. |
-| `--sidebar-ring` (light) | `0.925` | `0.52` | Focus ring on the sidebar was 1.19:1. |
-| `--brand` (new) | | `0.605 0.107 184.2` | The supplied teal, kept for decoration only (glows, logo hands, illustration). |
-| `--font-heading` fallback | `sans-serif` | `serif` | Lora is a serif. |
+| Token                       | Supplied                   | Shipped                    | Reason                                                                         |
+| --------------------------- | -------------------------- | -------------------------- | ------------------------------------------------------------------------------ |
+| `--primary` (light, dark)   | `oklch(0.605 0.107 184.2)` | `oklch(0.52 0.107 184.2)`  | White label was 3.67:1; now 5.09:1 (needs 4.5).                                |
+| `--link` (new)              | (primary)                  | light `0.52`, dark `0.685` | Text links need 4.5:1 on their surface.                                        |
+| `--ring` (light)            | `0.605 / 0.9`              | `0.52` solid               | A solid ring keeps 3:1 on every surface.                                       |
+| `--input`                   | light `0.925`, dark `0.29` | light `0.66`, dark `0.50`  | Input boundaries were 1.25:1 / 1.40:1; now 3.10:1 / 3.29:1.                    |
+| `--sidebar-primary` (light) | `0.605`                    | `0.52`                     | Active item carries white text.                                                |
+| `--sidebar-ring` (light)    | `0.925`                    | `0.52`                     | Focus ring on the sidebar was 1.19:1.                                          |
+| `--brand` (new)             |                            | `0.605 0.107 184.2`        | The supplied teal, kept for decoration only (glows, logo hands, illustration). |
+| `--font-heading` fallback   | `sans-serif`               | `serif`                    | Lora is a serif.                                                               |
 
 Added semantic families (not in the supplied theme, required for alerts,
 badges and snackbars): `--success`, `--warning`, `--info` and
@@ -80,11 +80,11 @@ Rules:
 
 ## 4. Typography
 
-| Role | Family | Use |
-| --- | --- | --- |
-| Headings `h1`-`h3`, display numbers | Lora (`font-heading`) | Page titles, section titles, prices |
-| UI and body | Geist (`font-sans`) | Everything else, including card titles (`font-sans` on `h2`/`h3` inside cards) |
-| Code, IDs, correlation references | Geist Mono (`font-mono`) | Snippets, support references |
+| Role                                | Family                   | Use                                                                            |
+| ----------------------------------- | ------------------------ | ------------------------------------------------------------------------------ |
+| Headings `h1`-`h3`, display numbers | Lora (`font-heading`)    | Page titles, section titles, prices                                            |
+| UI and body                         | Geist (`font-sans`)      | Everything else, including card titles (`font-sans` on `h2`/`h3` inside cards) |
+| Code, IDs, correlation references   | Geist Mono (`font-mono`) | Snippets, support references                                                   |
 
 Scale (rem / line height), every line height on the 4 pt grid: `xs` 0.75/1,
 `sm` 0.875/1.25, `base` 1/1.5, `lg` 1.125/1.75, `xl` 1.25/1.75, `2xl` 1.5/2,
@@ -102,7 +102,7 @@ Scale (rem / line height), every line height on the 4 pt grid: `xs` 0.75/1,
 ## 5. Space, grid, radius, elevation
 
 - **Spacing**: Tailwind's 4 px unit. Use 8 pt steps for layout (`2, 4, 6, 8,
-  10, 12, 16, 20, 24` = 8 to 96 px) and 4 pt steps (`1, 3`) only for fine
+10, 12, 16, 20, 24` = 8 to 96 px) and 4 pt steps (`1, 3`) only for fine
   alignment inside components.
 - **Controls**: heights 32 (`sm`), 40 (`md`, default), 48 (`lg`, forms and
   primary actions). Touch targets are at least 24 x 24 px (WCAG 2.5.8); prefer
@@ -150,42 +150,42 @@ Scale (rem / line height), every line height on the 4 pt grid: `xs` 0.75/1,
 
 ## 8. Components (`@workspace/ui/components/*`)
 
-| Component | Purpose and rules |
-| --- | --- |
-| `Button`, `buttonVariants` | Variants `primary`, `secondary`, `outline`, `ghost`, `destructive`, `link`; sizes `sm`/`md`/`lg` and icon sizes; `loading` keeps focus, sets `aria-busy`, blocks double submit. Each variant sets exactly one border colour (regression-tested). Links styled as buttons use `buttonVariants`. |
-| `Form` | The only form element: validates on submit, marks fields `aria-invalid`, focuses the first invalid field, and maps server errors via `errors={{ fieldName: "..." }}`. |
-| `Field`, `FieldLabel` (`required`), `FieldDescription`, `FieldError` (`match`), `FieldControl`, `InputGroup`, `InputGroupIcon` | The single field pattern (section 11). |
-| `Card` (+ `Header`, `Title` with `headingLevel`, `Description`, `Action`, `Content`, `Footer`) | Widget anatomy: heading with icon, filter or customisation slot, link to the full view, simplified content. |
-| `Alert` (`tone` info/success/warning/error) | Page-level messages. Errors are `role="alert"`; others `role="status"`. Title states the outcome. |
-| `Badge`, `CountBadge` | Status chips and "9+" counters with full spoken labels. |
-| `ProgressBar`, `ProgressRing` | Allowances and setup progress, with visible and spoken values. |
-| `Skeleton`, `LoadingRegion` | Layout-matched placeholders announced once. |
-| `Spinner` | Inline pending state with a status label. |
-| `Breadcrumbs` | Classic breadcrumbs; current page `aria-current="page"`; `renderLink` for `next/link`. |
-| `PageHeader` | Breadcrumbs, one `h1`, description, actions. |
-| `EmptyState`, `ErrorState` | Empty: what is missing and the next action. Error: human message, correlation reference, retry. |
-| `ThemeSelector` | Indicator-style segmented selector (light, dark, system) as an arrow-key radio group; `compact` icon-only mode with names. |
-| `Sheet` (+ `Trigger`, `Content` `side`, `Title`, `Description`, `Close`) | Edge drawer: focus trap, Escape, scroll lock, focus return. Mobile navigation and small editors. |
-| `Sidebar` family, `BottomNav` | Section 9. |
-| `SkipLink`, `StagingBanner`, `Logo`, `CSPProvider` | Page chrome; `CSPProvider` passes the request nonce to Base UI inline tags. |
+| Component                                                                                                                      | Purpose and rules                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`, `buttonVariants`                                                                                                     | Variants `primary`, `secondary`, `outline`, `ghost`, `destructive`, `link`; sizes `sm`/`md`/`lg` and icon sizes; `loading` keeps focus, sets `aria-busy`, blocks double submit. Each variant sets exactly one border colour (regression-tested). Links styled as buttons use `buttonVariants`. |
+| `Form`                                                                                                                         | The only form element: validates on submit, marks fields `aria-invalid`, focuses the first invalid field, and maps server errors via `errors={{ fieldName: "..." }}`.                                                                                                                          |
+| `Field`, `FieldLabel` (`required`), `FieldDescription`, `FieldError` (`match`), `FieldControl`, `InputGroup`, `InputGroupIcon` | The single field pattern (section 11).                                                                                                                                                                                                                                                         |
+| `Card` (+ `Header`, `Title` with `headingLevel`, `Description`, `Action`, `Content`, `Footer`)                                 | Widget anatomy: heading with icon, filter or customisation slot, link to the full view, simplified content.                                                                                                                                                                                    |
+| `Alert` (`tone` info/success/warning/error)                                                                                    | Page-level messages. Errors are `role="alert"`; others `role="status"`. Title states the outcome.                                                                                                                                                                                              |
+| `Badge`, `CountBadge`                                                                                                          | Status chips and "9+" counters with full spoken labels.                                                                                                                                                                                                                                        |
+| `ProgressBar`, `ProgressRing`                                                                                                  | Allowances and setup progress, with visible and spoken values.                                                                                                                                                                                                                                 |
+| `Skeleton`, `LoadingRegion`                                                                                                    | Layout-matched placeholders announced once.                                                                                                                                                                                                                                                    |
+| `Spinner`                                                                                                                      | Inline pending state with a status label.                                                                                                                                                                                                                                                      |
+| `Breadcrumbs`                                                                                                                  | Classic breadcrumbs; current page `aria-current="page"`; `renderLink` for `next/link`.                                                                                                                                                                                                         |
+| `PageHeader`                                                                                                                   | Breadcrumbs, one `h1`, description, actions.                                                                                                                                                                                                                                                   |
+| `EmptyState`, `ErrorState`                                                                                                     | Empty: what is missing and the next action. Error: human message, correlation reference, retry.                                                                                                                                                                                                |
+| `ThemeSelector`                                                                                                                | Indicator-style segmented selector (light, dark, system) as an arrow-key radio group; `compact` icon-only mode with names.                                                                                                                                                                     |
+| `Sheet` (+ `Trigger`, `Content` `side`, `Title`, `Description`, `Close`)                                                       | Edge drawer: focus trap, Escape, scroll lock, focus return. Mobile navigation and small editors.                                                                                                                                                                                               |
+| `Sidebar` family, `BottomNav`                                                                                                  | Section 9.                                                                                                                                                                                                                                                                                     |
+| `SkipLink`, `StagingBanner`, `Logo`, `CSPProvider`                                                                             | Page chrome; `CSPProvider` passes the request nonce to Base UI inline tags.                                                                                                                                                                                                                    |
 
 **Still to build, in the workstream that first needs them** (use Base UI
 primitives already installed: dialog, alert-dialog, popover, tooltip, toast,
 menu, select, switch, checkbox, radio-group, slider, tabs, toggle-group,
 scroll-area, avatar, collapsible):
 
-| Component | Workstream | Notes |
-| --- | --- | --- |
-| `Dialog`, `AlertDialog` (destructive confirm) | 6.3, 6.5 | Typed confirmation for workspace deletion; focus returns to the trigger. |
-| `Toast` / snackbar | 6.3+ | Background confirmations only ("Session revoked"); never the only error channel. |
-| `Menu` (profile, workspace switcher) | 6.4, 6.5 | Keyboard type-ahead; switcher lists at most the owner's workspaces. |
-| `Switch`, `Checkbox`, `RadioGroup` (card and minimal selectors), `Select` | 6.4, 6.6 | Checkboxes for multi-choice, radios/select for one choice. Card selectors for setup choices; glass/indicator variants only on dark hero surfaces. |
-| `Tooltip` (standalone) | 6.3+ | Supplementary only; never essential information. |
-| `SearchField` | 6.6 | Only when a list exceeds 6-8 items (settings guidance). |
-| `Tabs` | 6.6 | Settings sub-pages when not using routes. |
-| `Avatar` | 6.3, 6.6 | Initials fallback; uploads are out of Phase 6 scope unless approved. |
-| `OtpInput` | 6.2 | **One** native input (`inputmode="numeric"`, `autocomplete="one-time-code"`, `maxlength=6`), not Base UI's multi-input OTP field. |
-| `PasswordInput` | 6.2 | Show/hide toggle with `aria-pressed`, as in the catalogue form demo. |
+| Component                                                                 | Workstream | Notes                                                                                                                                             |
+| ------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Dialog`, `AlertDialog` (destructive confirm)                             | 6.3, 6.5   | Typed confirmation for workspace deletion; focus returns to the trigger.                                                                          |
+| `Toast` / snackbar                                                        | 6.3+       | Background confirmations only ("Session revoked"); never the only error channel.                                                                  |
+| `Menu` (profile, workspace switcher)                                      | 6.4, 6.5   | Keyboard type-ahead; switcher lists at most the owner's workspaces.                                                                               |
+| `Switch`, `Checkbox`, `RadioGroup` (card and minimal selectors), `Select` | 6.4, 6.6   | Checkboxes for multi-choice, radios/select for one choice. Card selectors for setup choices; glass/indicator variants only on dark hero surfaces. |
+| `Tooltip` (standalone)                                                    | 6.3+       | Supplementary only; never essential information.                                                                                                  |
+| `SearchField`                                                             | 6.6        | Only when a list exceeds 6-8 items (settings guidance).                                                                                           |
+| `Tabs`                                                                    | 6.6        | Settings sub-pages when not using routes.                                                                                                         |
+| `Avatar`                                                                  | 6.3, 6.6   | Initials fallback; uploads are out of Phase 6 scope unless approved.                                                                              |
+| `OtpInput`                                                                | 6.2        | **One** native input (`inputmode="numeric"`, `autocomplete="one-time-code"`, `maxlength=6`), not Base UI's multi-input OTP field.                 |
+| `PasswordInput`                                                           | 6.2        | Show/hide toggle with `aria-pressed`, as in the catalogue form demo.                                                                              |
 
 Every new component: typed props with safe defaults, refs and ARIA wiring
 built in, a catalogue entry, a Playwright behaviour test, axe clean in both
@@ -197,20 +197,20 @@ Structure (top to bottom): brand logo and the minimise/maximise toggle on the
 sidebar edge; labelled sections of main items; a secondary item group; flexible
 space; a call-to-action card; settings and help; divider; the workspace row.
 
-| Measure | Value |
-| --- | --- |
-| Width | 240 px expanded, 80 px collapsed rail (cookie-persisted, read by the server layout to avoid shift) |
-| Header | 64 px, logo left, toggle centred on the right edge |
-| Section label | 12 px muted text; names its list (`aria-labelledby`), not a heading |
-| Items | 40 px high, 4 px apart, 12 px inner padding, 20 px icon + 12 px gap |
-| Section spacing | 24 px |
-| Active item | filled `sidebar-primary` with `aria-current="page"` |
-| Hover | `sidebar-accent` tint |
-| Status indicator | right-aligned `CountBadge` ("9+") with a spoken label |
-| Secondary level | expandable primary item (chevron rotates) with 32 px children on a tree rail and leading lines; never deeper than two levels |
-| Unavailable item | muted, not a link, "Later" marker and spoken "(available in a later release)" |
-| Collapsed rail | icons only, labels kept for screen readers, tooltips on hover/focus; groups act as links to their overview |
-| Call to action | bottom card (setup progress ring plus one action); hidden in the rail |
+| Measure                | Value                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Width                  | 240 px expanded, 80 px collapsed rail (cookie-persisted, read by the server layout to avoid shift)                           |
+| Header                 | 64 px, logo left, toggle centred on the right edge                                                                           |
+| Section label          | 12 px muted text; names its list (`aria-labelledby`), not a heading                                                          |
+| Items                  | 40 px high, 4 px apart, 12 px inner padding, 20 px icon + 12 px gap                                                          |
+| Section spacing        | 24 px                                                                                                                        |
+| Active item            | filled `sidebar-primary` with `aria-current="page"`                                                                          |
+| Hover                  | `sidebar-accent` tint                                                                                                        |
+| Status indicator       | right-aligned `CountBadge` ("9+") with a spoken label                                                                        |
+| Secondary level        | expandable primary item (chevron rotates) with 32 px children on a tree rail and leading lines; never deeper than two levels |
+| Unavailable item       | muted, not a link, "Later" marker and spoken "(available in a later release)"                                                |
+| Collapsed rail         | icons only, labels kept for screen readers, tooltips on hover/focus; groups act as links to their overview                   |
+| Call to action         | bottom card (setup progress ring plus one action); hidden in the rail                                                        |
 | Mobile (below 1024 px) | sidebar hidden; hamburger opens the same navigation in a `Sheet`; `BottomNav` with 3-5 destinations (64 px, icon plus label) |
 
 Proposed owner information architecture (owner approval in 6.4/6.5):
@@ -277,10 +277,10 @@ Defaults come from onboarding (timezone Africa/Blantyre, language English).
 
 ## 13. Surfaces and security
 
-| Surface | App | Rendering | CSP |
-| --- | --- | --- | --- |
+| Surface             | App              | Rendering                           | CSP                                                                                                                                                                                                      |
+| ------------------- | ---------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Landing (profile M) | `apps/marketing` | Static export to `out/`, CDN-served | Build-time hashes in `out/_headers` (one site-wide rule); `script-src 'self'` + hashes, no `unsafe-inline`/`unsafe-eval`; `style-src-attr 'unsafe-inline'` only because Base UI renders style attributes |
-| Owner (profile O) | `apps/web` | Dynamic (nonce requires it) | `proxy.ts`: per-request nonce, `'strict-dynamic'`, `frame-ancestors 'none'`, `private, no-store`, `noindex`, COOP |
+| Owner (profile O)   | `apps/web`       | Dynamic (nonce requires it)         | `proxy.ts`: per-request nonce, `'strict-dynamic'`, `frame-ancestors 'none'`, `private, no-store`, `noindex`, COOP                                                                                        |
 
 Do not use `next-themes`' `disableTransitionOnChange` on the static site: it
 injects a runtime `<style>` the hashed policy blocks (caught by tests).

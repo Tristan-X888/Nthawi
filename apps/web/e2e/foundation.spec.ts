@@ -8,7 +8,11 @@ const screenshotDir = process.env.NTHAWI_SCREENSHOT_DIR
 function watchForViolations(page: Page) {
   const problems: string[] = []
   page.on("console", (message) => {
-    if (/Content Security Policy|Refused to (execute|load|apply)/i.test(message.text())) {
+    if (
+      /Content Security Policy|Refused to (execute|load|apply)/i.test(
+        message.text()
+      )
+    ) {
       problems.push(message.text())
     }
   })
@@ -21,30 +25,45 @@ async function expectNoSeriousAxeIssues(page: Page) {
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze()
   const blocking = results.violations.filter(
-    (violation) => violation.impact === "serious" || violation.impact === "critical"
+    (violation) =>
+      violation.impact === "serious" || violation.impact === "critical"
   )
-  expect(blocking.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
+  expect(
+    blocking.map(
+      (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`
+    )
+  ).toEqual([])
 }
 
 for (const colorScheme of ["light", "dark"] as const) {
-  test(`catalogue has no serious or critical axe issues (${colorScheme})`, async ({ page }) => {
+  test(`catalogue has no serious or critical axe issues (${colorScheme})`, async ({
+    page,
+  }) => {
     const problems = watchForViolations(page)
     await page.emulateMedia({ colorScheme })
     await page.goto("/catalogue")
-    await expect(page.getByRole("heading", { level: 1, name: "Component catalogue" })).toBeVisible()
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Component catalogue" })
+    ).toBeVisible()
     await expectNoSeriousAxeIssues(page)
     expect(problems).toEqual([])
   })
 }
 
-test("outline buttons keep a visible boundary (regression: border utility order)", async ({ page }) => {
+test("outline buttons keep a visible boundary (regression: border utility order)", async ({
+  page,
+}) => {
   await page.goto("/catalogue")
   const outline = page.getByRole("button", { name: "Outline" })
-  const colour = await outline.evaluate((el) => getComputedStyle(el).borderTopColor)
+  const colour = await outline.evaluate(
+    (el) => getComputedStyle(el).borderTopColor
+  )
   expect(colour).not.toBe("rgba(0, 0, 0, 0)")
 })
 
-test("skip link is the first focus stop and moves focus to main", async ({ page }) => {
+test("skip link is the first focus stop and moves focus to main", async ({
+  page,
+}) => {
   await page.goto("/catalogue")
   await page.keyboard.press("Tab")
   const skip = page.getByRole("link", { name: "Skip to main content" })
@@ -54,7 +73,9 @@ test("skip link is the first focus stop and moves focus to main", async ({ page 
   await expect(page.locator("main#main")).toBeFocused()
 })
 
-test("form errors are announced through the field, not colour alone", async ({ page }) => {
+test("form errors are announced through the field, not colour alone", async ({
+  page,
+}) => {
   await page.goto("/catalogue")
   const form = page.getByRole("form", { name: "Sign in to Nthawi" })
   await form.getByRole("button", { name: "Sign in", exact: true }).click()
@@ -66,7 +87,9 @@ test("form errors are announced through the field, not colour alone", async ({ p
   expect(describedBy).toBeTruthy()
 })
 
-test("sidebar collapses to the 80 px rail and names icons", async ({ page }) => {
+test("sidebar collapses to the 80 px rail and names icons", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto("/catalogue")
   const sidebar = page.locator("aside")
@@ -74,13 +97,20 @@ test("sidebar collapses to the 80 px rail and names icons", async ({ page }) => 
   const toggle = page.getByRole("button", { name: "Collapse navigation" })
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
   await toggle.click()
-  await expect(page.getByRole("button", { name: "Expand navigation" })).toHaveAttribute("aria-expanded", "false")
+  await expect(
+    page.getByRole("button", { name: "Expand navigation" })
+  ).toHaveAttribute("aria-expanded", "false")
   await expect(sidebar).toHaveCSS("width", "80px")
   // Labels stay available to assistive technology in the rail.
-  await expect(page.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page")
+  await expect(page.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    "aria-current",
+    "page"
+  )
 })
 
-test("secondary level expands from its parent with the keyboard", async ({ page }) => {
+test("secondary level expands from its parent with the keyboard", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto("/catalogue")
   const settings = page.getByRole("button", { name: "Settings" })
@@ -110,14 +140,19 @@ test("no horizontal scrolling at any supported width", async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto("/catalogue")
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth
     )
     expect(overflow, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(0)
   }
 })
 
 test("screenshots at every width in light and dark", async ({ page }) => {
-  test.skip(!screenshotDir, "Set NTHAWI_SCREENSHOT_DIR to capture review screenshots.")
+  test.skip(
+    !screenshotDir,
+    "Set NTHAWI_SCREENSHOT_DIR to capture review screenshots."
+  )
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme, reducedMotion: "reduce" })
     for (const width of widths) {

@@ -5,7 +5,10 @@ import { copy } from "@/lib/copy"
 /** Route-level skeleton matching the page anatomy, so content does not shift. */
 export default function Loading() {
   return (
-    <LoadingRegion label={copy.loading} className="mx-auto flex w-full max-w-(--content-max) flex-col gap-8 px-4 py-8 md:px-8">
+    <LoadingRegion
+      label={copy.loading}
+      className="mx-auto flex w-full max-w-(--content-max) flex-col gap-8 px-4 py-8 md:px-8"
+    >
       <div className="flex flex-col gap-3">
         <Skeleton className="h-4 w-40" />
         <Skeleton className="h-10 w-72 max-w-full" />

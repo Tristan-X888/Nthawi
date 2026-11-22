@@ -30,7 +30,11 @@ export type NavItem = NavLeaf & {
   children?: readonly NavLeaf[]
 }
 
-export type NavSection = { id: string; label: string; items: readonly NavItem[] }
+export type NavSection = {
+  id: string
+  label: string
+  items: readonly NavItem[]
+}
 
 type LinkComponent = React.ElementType<{
   href: string
@@ -50,7 +54,8 @@ const SidebarContext = React.createContext<SidebarContextValue | null>(null)
 
 function useSidebar() {
   const context = React.useContext(SidebarContext)
-  if (!context) throw new Error("Sidebar parts must be used inside SidebarProvider.")
+  if (!context)
+    throw new Error("Sidebar parts must be used inside SidebarProvider.")
   return context
 }
 
@@ -115,8 +120,13 @@ function Sidebar({
         className
       )}
     >
-      <div className="relative flex h-16 shrink-0 items-center px-4">{header}</div>
-      <nav aria-label={label} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">
+      <div className="relative flex h-16 shrink-0 items-center px-4">
+        {header}
+      </div>
+      <nav
+        aria-label={label}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4"
+      >
         {children}
       </nav>
       {footer ? (
@@ -142,7 +152,10 @@ function SidebarCollapseToggle({ className }: { className?: string }) {
         className
       )}
     >
-      <Icon name={collapsed ? "chevron-right" : "chevron-left"} className="size-4" />
+      <Icon
+        name={collapsed ? "chevron-right" : "chevron-left"}
+        className="size-4"
+      />
     </button>
   )
 }
@@ -165,7 +178,11 @@ function SidebarSection({ section }: { section: NavSection }) {
       <ul aria-labelledby={headingId} className="flex flex-col gap-1">
         {section.items.map((item) => (
           <li key={item.id}>
-            {item.children?.length ? <SidebarGroup item={item} /> : <SidebarLink item={item} />}
+            {item.children?.length ? (
+              <SidebarGroup item={item} />
+            ) : (
+              <SidebarLink item={item} />
+            )}
           </li>
         ))}
       </ul>
@@ -176,7 +193,13 @@ function SidebarSection({ section }: { section: NavSection }) {
 const itemBase =
   "flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors duration-150 ease-standard"
 
-function WithTooltip({ label, children }: { label: string; children: React.ReactElement }) {
+function WithTooltip({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactElement
+}) {
   const { collapsed } = useSidebar()
   if (!collapsed) return children
   return (
@@ -198,7 +221,12 @@ function ItemContent({ item }: { item: NavItem }) {
   return (
     <>
       <Icon name={item.icon} />
-      <span className={cn("min-w-0 flex-1 truncate text-start", collapsed && "sr-only")}>
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-start",
+          collapsed && "sr-only"
+        )}
+      >
         {item.label}
       </span>
       {item.unavailable && !collapsed ? (
@@ -219,7 +247,11 @@ function SidebarLink({ item }: { item: NavItem }) {
       <WithTooltip label={`${item.label}: available in a later release`}>
         <span
           aria-disabled="true"
-          className={cn(itemBase, "cursor-not-allowed text-muted-foreground", collapsed && "justify-center px-0")}
+          className={cn(
+            itemBase,
+            "cursor-not-allowed text-muted-foreground",
+            collapsed && "justify-center px-0"
+          )}
         >
           <ItemContent item={item} />
           <span className="sr-only">(available in a later release)</span>
@@ -269,7 +301,10 @@ function SidebarGroup({ item }: { item: NavItem }) {
         <ItemContent item={item} />
         <Icon
           name="chevron-down"
-          className={cn("size-4 transition-transform duration-200", open && "rotate-180")}
+          className={cn(
+            "size-4 transition-transform duration-200",
+            open && "rotate-180"
+          )}
         />
       </Collapsible.Trigger>
       <Collapsible.Panel>
@@ -305,11 +340,22 @@ function SidebarGroup({ item }: { item: NavItem }) {
 }
 
 /** Call-to-action card for the bottom of the sidebar; hidden in the rail. */
-function SidebarCallout({ children, className }: { children: React.ReactNode; className?: string }) {
+function SidebarCallout({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
   const { collapsed } = useSidebar()
   if (collapsed) return null
   return (
-    <div className={cn("flex flex-col gap-3 rounded-lg border border-sidebar-border bg-background p-4", className)}>
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border border-sidebar-border bg-background p-4",
+        className
+      )}
+    >
       {children}
     </div>
   )
@@ -330,7 +376,7 @@ function BottomNav({
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-flow-col auto-cols-fr">
+      <ul className="mx-auto grid max-w-md auto-cols-fr grid-flow-col">
         {items.map((item) => {
           const active = isActive(currentPath, item.href)
           return (
@@ -340,7 +386,9 @@ function BottomNav({
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium",
-                  active ? "text-link" : "text-muted-foreground hover:text-foreground"
+                  active
+                    ? "text-link"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Icon name={item.icon} className="size-6" />

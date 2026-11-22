@@ -40,7 +40,12 @@ function SheetContent({
 }
 
 function SheetTitle({ className, ...props }: Dialog.Title.Props) {
-  return <Dialog.Title className={cn("text-lg font-semibold", className)} {...props} />
+  return (
+    <Dialog.Title
+      className={cn("text-lg font-semibold", className)}
+      {...props}
+    />
+  )
 }
 
 function SheetDescription({ className, ...props }: Dialog.Description.Props) {

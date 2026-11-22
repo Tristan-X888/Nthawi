@@ -10,11 +10,12 @@ import { cn } from "@workspace/ui/lib/utils"
 
 const subscribeNever = () => () => {}
 
-const options: ReadonlyArray<{ value: string; label: string; icon: IconName }> = [
-  { value: "light", label: "Light", icon: "sun" },
-  { value: "dark", label: "Dark", icon: "moon" },
-  { value: "system", label: "System", icon: "system" },
-]
+const options: ReadonlyArray<{ value: string; label: string; icon: IconName }> =
+  [
+    { value: "light", label: "Light", icon: "sun" },
+    { value: "dark", label: "Dark", icon: "moon" },
+    { value: "system", label: "System", icon: "system" },
+  ]
 
 /**
  * Segmented "indicator" selector for light, dark and system themes. A radio
@@ -40,7 +41,10 @@ function ThemeSelector({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <span id={labelId} className={compact ? "sr-only" : "text-sm font-semibold"}>
+      <span
+        id={labelId}
+        className={compact ? "sr-only" : "text-sm font-semibold"}
+      >
         Theme
       </span>
       <RadioGroup

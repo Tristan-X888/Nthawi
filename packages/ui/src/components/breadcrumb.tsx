@@ -12,7 +12,10 @@ export type BreadcrumbItem = {
 type BreadcrumbsProps = {
   items: readonly BreadcrumbItem[]
   /** Render links with the host framework's link (for example next/link). */
-  renderLink?: (item: Required<BreadcrumbItem>, className: string) => React.ReactNode
+  renderLink?: (
+    item: Required<BreadcrumbItem>,
+    className: string
+  ) => React.ReactNode
   className?: string
 }
 
@@ -27,7 +30,10 @@ function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) {
         {items.map((item, index) => {
           const last = index === items.length - 1
           return (
-            <li key={`${item.label}-${index}`} className="flex min-w-0 items-center gap-1">
+            <li
+              key={`${item.label}-${index}`}
+              className="flex min-w-0 items-center gap-1"
+            >
               {item.href && !last ? (
                 renderLink ? (
                   renderLink({ label: item.label, href: item.href }, linkClass)
@@ -45,7 +51,10 @@ function Breadcrumbs({ items, renderLink, className }: BreadcrumbsProps) {
                 </span>
               )}
               {last ? null : (
-                <Icon name="chevron-right" className="size-4 text-muted-foreground" />
+                <Icon
+                  name="chevron-right"
+                  className="size-4 text-muted-foreground"
+                />
               )}
             </li>
           )

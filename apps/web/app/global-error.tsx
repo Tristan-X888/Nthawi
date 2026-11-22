@@ -20,7 +20,8 @@ export default function GlobalError({
           <p className="text-muted-foreground">{copy.error.description}</p>
           {error.digest ? (
             <p className="text-xs text-muted-foreground">
-              Reference for support: <code className="font-mono">{error.digest}</code>
+              Reference for support:{" "}
+              <code className="font-mono">{error.digest}</code>
             </p>
           ) : null}
           <button

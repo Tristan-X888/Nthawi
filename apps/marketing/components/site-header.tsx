@@ -23,7 +23,10 @@ export function SiteHeader() {
           <ul className="flex items-center gap-1">
             {primaryLinks.map((link) => (
               <li key={link.href}>
-                <Link href={link.href} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                <Link
+                  href={link.href}
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                >
                   {link.label}
                 </Link>
               </li>
@@ -31,14 +34,24 @@ export function SiteHeader() {
           </ul>
         </nav>
         <div className="ms-auto hidden items-center gap-2 md:flex">
-          <a href={`${appOrigin}/sign-in`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          <a
+            href={`${appOrigin}/sign-in`}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
             Sign in
           </a>
-          <a href={`${appOrigin}/sign-up`} className={buttonVariants({ size: "sm" })}>
+          <a
+            href={`${appOrigin}/sign-up`}
+            className={buttonVariants({ size: "sm" })}
+          >
             Create an account
           </a>
         </div>
-        <MobileMenu links={primaryLinks} signInHref={`${appOrigin}/sign-in`} signUpHref={`${appOrigin}/sign-up`} />
+        <MobileMenu
+          links={primaryLinks}
+          signInHref={`${appOrigin}/sign-in`}
+          signUpHref={`${appOrigin}/sign-up`}
+        />
       </div>
     </header>
   )

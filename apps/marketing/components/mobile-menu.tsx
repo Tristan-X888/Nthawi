@@ -6,7 +6,13 @@ import * as React from "react"
 import { buttonVariants } from "@workspace/ui/components/button"
 import { Icon } from "@workspace/ui/components/icon"
 import { Logo } from "@workspace/ui/components/logo"
-import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@workspace/ui/components/sheet"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@workspace/ui/components/sheet"
 
 /** Hamburger menu below md: a focus-trapped sheet that closes on navigation. */
 export function MobileMenu({
@@ -31,7 +37,10 @@ export function MobileMenu({
         <div className="flex items-center justify-between">
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <Logo />
-          <SheetClose aria-label="Close menu" className="grid size-10 place-items-center rounded-md hover:bg-accent">
+          <SheetClose
+            aria-label="Close menu"
+            className="grid size-10 place-items-center rounded-md hover:bg-accent"
+          >
             <Icon name="close" />
           </SheetClose>
         </div>
@@ -51,10 +60,20 @@ export function MobileMenu({
           </ul>
         </nav>
         <div className="mt-auto flex flex-col gap-3">
-          <a href={signUpHref} className={buttonVariants({ size: "lg", width: "full" })}>
+          <a
+            href={signUpHref}
+            className={buttonVariants({ size: "lg", width: "full" })}
+          >
             Create an account
           </a>
-          <a href={signInHref} className={buttonVariants({ variant: "outline", size: "lg", width: "full" })}>
+          <a
+            href={signInHref}
+            className={buttonVariants({
+              variant: "outline",
+              size: "lg",
+              width: "full",
+            })}
+          >
             Sign in
           </a>
         </div>

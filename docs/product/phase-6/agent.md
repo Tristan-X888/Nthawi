@@ -45,13 +45,13 @@ set (:106-111).
 
 ### Rate limits (key = client IP + path; precedence default < plugin < custom, `BA/api/rate-limiter/index.mjs:248-283`)
 
-| Path | Effective rule |
-| --- | --- |
-| `/sign-in/email`, `/sign-up/email` | 5 / 60 s (custom) |
-| `/sign-in/social`, `/change-password` | 3 / 10 s (built-in) |
-| `/sign-in/email-otp`, all `/email-otp/*`, `/forget-password/email-otp` | 3 / 60 s (plugin) |
-| `/request-password-reset`, `/send-verification-email` | 3 / 60 s |
-| everything else | 100 / 60 s |
+| Path                                                                   | Effective rule      |
+| ---------------------------------------------------------------------- | ------------------- |
+| `/sign-in/email`, `/sign-up/email`                                     | 5 / 60 s (custom)   |
+| `/sign-in/social`, `/change-password`                                  | 3 / 10 s (built-in) |
+| `/sign-in/email-otp`, all `/email-otp/*`, `/forget-password/email-otp` | 3 / 60 s (plugin)   |
+| `/request-password-reset`, `/send-verification-email`                  | 3 / 60 s            |
+| everything else                                                        | 100 / 60 s          |
 
 No bucket is keyed per recipient address, so many IPs can still flood one inbox (F7).
 
@@ -93,18 +93,18 @@ sets `app.workspace_id`. No `x-nf-sign` verifier exists yet (F6, Phase 5).
 
 ## Findings
 
-| ID | Severity | Finding | Evidence | Proposed fix |
-| --- | --- | --- | --- | --- |
-| SEC-00 | P0 | `deleteUser` bypassed the deletion journal | test red: 200 | **Fixed, PR #8** |
-| SEC-01 | High | OTP email change needs only a valid session: no freshness check, no password. A stolen session cookie can move the email and take over the account. | `BA/plugins/email-otp/routes.mjs:622-625` | Require a fresh session (or re-authentication) on `/email-otp/request-email-change` and `/change-email`. Test first. |
-| SEC-02 | High if key set | The `dash` plugin mounts `/dash/delete-user` and `/delete-many-users` (direct `adapter.delete`, ignoring `deleteUser`), plus `/execute-adapter`, `/impersonate-user`, `/export-users` and `/set-password` | `INFRA/index.mjs:9519-9535` | Remove the server `dash` plugin and the browser `dashClient()` (also closes F7), or block those routes. Owner decision. |
-| SEC-03 | Medium | Freshness covers only `/unlink-account`. Password change, revoke-sessions and email change use `sensitiveSessionMiddleware` (`BA/api/routes/session.mjs:304-311`), which does not check freshness. | as cited | An API-level fresh-session policy (6.3, Q5) |
-| SEC-04 | Medium | Email sends are awaited in-request, and only for existing accounts. That creates a timing oracle for account existence. | `routes.mjs:103-112`, `create-context.mjs:215-224` | `advanced.backgroundTasks.handler` with shutdown draining. Decision. |
-| SEC-05 | Medium | OTP sign-in with `disableSignUp` false creates passwordless accounts, bypassing sign-up | `routes.mjs:103, 412-413` | `disableSignUp: true` (Q6) |
-| OPS-01 | Medium | A rejected email still returns `{success:true}`, and the only trace is a bare `AUTH_SERVICE_ERROR` line. **This explains "works for one address only"** when the Resend domain is unverified. | `email.ts:30-34`, `create-context.mjs:215-224` | Content-free failure codes, a test matrix over every email kind, and a verified domain (Phase 5 step 5.6, after G-06) |
-| UI-01 | Medium | The single-key `d` theme hotkey fails WCAG 2.1.4 | `theme-provider.tsx:50` | Remove it |
-| UI-02 | Low | React skew: UI pins 19.2.4, web uses 19.3.0. Web devDeps lag root (eslint 9 vs 10, TS 5 vs 6). | `packages/ui/package.json:17-18` | Align in the foundation PR |
-| UI-03 | Low | `NEXT_PUBLIC_API_URL` defaults to `localhost:4000`. C5a requires a same-origin owner app, and C5e assigns port 4600. | `apps/web/.env.example:1` | Relative `/api/auth` |
+| ID     | Severity        | Finding                                                                                                                                                                                                   | Evidence                                           | Proposed fix                                                                                                            |
+| ------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| SEC-00 | P0              | `deleteUser` bypassed the deletion journal                                                                                                                                                                | test red: 200                                      | **Fixed, PR #8**                                                                                                        |
+| SEC-01 | High            | OTP email change needs only a valid session: no freshness check, no password. A stolen session cookie can move the email and take over the account.                                                       | `BA/plugins/email-otp/routes.mjs:622-625`          | Require a fresh session (or re-authentication) on `/email-otp/request-email-change` and `/change-email`. Test first.    |
+| SEC-02 | High if key set | The `dash` plugin mounts `/dash/delete-user` and `/delete-many-users` (direct `adapter.delete`, ignoring `deleteUser`), plus `/execute-adapter`, `/impersonate-user`, `/export-users` and `/set-password` | `INFRA/index.mjs:9519-9535`                        | Remove the server `dash` plugin and the browser `dashClient()` (also closes F7), or block those routes. Owner decision. |
+| SEC-03 | Medium          | Freshness covers only `/unlink-account`. Password change, revoke-sessions and email change use `sensitiveSessionMiddleware` (`BA/api/routes/session.mjs:304-311`), which does not check freshness.        | as cited                                           | An API-level fresh-session policy (6.3, Q5)                                                                             |
+| SEC-04 | Medium          | Email sends are awaited in-request, and only for existing accounts. That creates a timing oracle for account existence.                                                                                   | `routes.mjs:103-112`, `create-context.mjs:215-224` | `advanced.backgroundTasks.handler` with shutdown draining. Decision.                                                    |
+| SEC-05 | Medium          | OTP sign-in with `disableSignUp` false creates passwordless accounts, bypassing sign-up                                                                                                                   | `routes.mjs:103, 412-413`                          | `disableSignUp: true` (Q6)                                                                                              |
+| OPS-01 | Medium          | A rejected email still returns `{success:true}`, and the only trace is a bare `AUTH_SERVICE_ERROR` line. **This explains "works for one address only"** when the Resend domain is unverified.             | `email.ts:30-34`, `create-context.mjs:215-224`     | Content-free failure codes, a test matrix over every email kind, and a verified domain (Phase 5 step 5.6, after G-06)   |
+| UI-01  | Medium          | The single-key `d` theme hotkey fails WCAG 2.1.4                                                                                                                                                          | `theme-provider.tsx:50`                            | Remove it                                                                                                               |
+| UI-02  | Low             | React skew: UI pins 19.2.4, web uses 19.3.0. Web devDeps lag root (eslint 9 vs 10, TS 5 vs 6).                                                                                                            | `packages/ui/package.json:17-18`                   | Align in the foundation PR                                                                                              |
+| UI-03  | Low             | `NEXT_PUBLIC_API_URL` defaults to `localhost:4000`. C5a requires a same-origin owner app, and C5e assigns port 4600.                                                                                      | `apps/web/.env.example:1`                          | Relative `/api/auth`                                                                                                    |
 
 ## Owner design inputs: conflicts (evidence: local OKLCH to WCAG calculation)
 
@@ -166,13 +166,13 @@ Phase 6 Step 5 cannot run. There is no `phase-5-outbox.md`.
 
 ### New findings
 
-| ID | Severity | Finding | Evidence | Disposition |
-| --- | --- | --- | --- | --- |
+| ID      | Severity        | Finding                                                                                                                                                                                      | Evidence                                                                                                                                                                                                                                                    | Disposition                                                                                                                                                                                                                 |
+| ------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | NEXT-01 | High (delivery) | `next build` intermittently exits 1 with a Next.js "SecurityFatalError" notice (local: web 1 of 4 attempts, marketing 2 of 4). Fresh CI runners and Netlify builders may fail deploy builds. | Build logs; `pnpm audit`: 7 moderate advisories for next >=16.0.0 <=16.4.4, fixed in 16.4.5, including HttpOnly cookie exposure on Edge-runtime routes (GHSA-f3mh-rxg3-f5g2) and response injection when forwarding fetched responses (GHSA-pc58-hwjq-p385) | **Owner decision**: approve a 16.4.1 -> 16.4.5 patch upgrade as its own reviewed dependency PR. Not done unilaterally (A3). The build output also contained instructions addressed to an assistant; they were not followed. |
-| NEXT-02 | Info | `pnpm audit` reports 87 advisories (27 high, 0 critical) across the workspace, mostly transitive (undici, hono, js-yaml, brace-expansion, tmp). | `pnpm audit --json` | Separate dependency-review task; none introduced by Phase 6. |
-| UI-04 | Medium (fixed) | Outline buttons had no visible border: Tailwind emits `.border-transparent` after `.border-input`, so the base class always won. | Compiled CSS order; screenshot | Each variant sets one border colour; regression tests in both apps. |
-| CSP-01 | Medium (fixed) | next-themes `disableTransitionOnChange` injects a runtime `<style>` that a hashed static CSP blocks. | Browser console in tests | Option disabled on the static site; tests assert zero CSP violations. |
-| A11Y-01 | Low (fixed) | Reduced motion kept the animation delay, leaving hero messages invisible. | Screenshot | `animation: none` under reduced motion; regression test. |
+| NEXT-02 | Info            | `pnpm audit` reports 87 advisories (27 high, 0 critical) across the workspace, mostly transitive (undici, hono, js-yaml, brace-expansion, tmp).                                              | `pnpm audit --json`                                                                                                                                                                                                                                         | Separate dependency-review task; none introduced by Phase 6.                                                                                                                                                                |
+| UI-04   | Medium (fixed)  | Outline buttons had no visible border: Tailwind emits `.border-transparent` after `.border-input`, so the base class always won.                                                             | Compiled CSS order; screenshot                                                                                                                                                                                                                              | Each variant sets one border colour; regression tests in both apps.                                                                                                                                                         |
+| CSP-01  | Medium (fixed)  | next-themes `disableTransitionOnChange` injects a runtime `<style>` that a hashed static CSP blocks.                                                                                         | Browser console in tests                                                                                                                                                                                                                                    | Option disabled on the static site; tests assert zero CSP violations.                                                                                                                                                       |
+| A11Y-01 | Low (fixed)     | Reduced motion kept the animation delay, leaving hero messages invisible.                                                                                                                    | Screenshot                                                                                                                                                                                                                                                  | `animation: none` under reduced motion; regression test.                                                                                                                                                                    |
 
 ### Decisions taken under standing owner direction (reversible)
 
@@ -182,7 +182,7 @@ Phase 6 Step 5 cannot run. There is no `phase-5-outbox.md`.
 - D6-8: tokens and components in `packages/ui`; the catalogue exists only in
   builds made with `NTHAWI_CATALOGUE=1` (custom page extension).
 - Owner CSP: per-request nonce with `'strict-dynamic'`; `style-src-attr
-  'unsafe-inline'` because Base UI and Next render style attributes
+'unsafe-inline'` because Base UI and Next render style attributes
   (attribute styles cannot execute script).
 - `dashClient()` removed from the browser (F7); the server `dash` plugin
   stays registered only when `BETTER_AUTH_API_KEY` is set (SEC-02 still needs

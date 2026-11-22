@@ -11,12 +11,20 @@ import { copy } from "@/lib/copy"
  */
 export default function NotFound() {
   return (
-    <main id="main" tabIndex={-1} className="grid min-h-dvh place-items-center px-4 py-12 outline-none">
+    <main
+      id="main"
+      tabIndex={-1}
+      className="grid min-h-dvh place-items-center px-4 py-12 outline-none"
+    >
       <div className="flex w-full max-w-md flex-col items-start gap-6">
         <Logo />
         <div className="flex flex-col gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">{copy.notFound.title}</h1>
-          <p className="text-base text-muted-foreground">{copy.notFound.description}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {copy.notFound.title}
+          </h1>
+          <p className="text-base text-muted-foreground">
+            {copy.notFound.description}
+          </p>
         </div>
         <Link href="/" className={buttonVariants({ variant: "primary" })}>
           {copy.notFound.action}

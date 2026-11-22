@@ -79,7 +79,9 @@ function ErrorState({
       {correlationId ? (
         <p className="text-xs text-muted-foreground">
           Reference for support:{" "}
-          <code className="font-mono text-foreground select-all">{correlationId}</code>
+          <code className="font-mono text-foreground select-all">
+            {correlationId}
+          </code>
         </p>
       ) : null}
       {action}

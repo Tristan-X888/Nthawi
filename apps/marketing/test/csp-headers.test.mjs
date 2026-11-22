@@ -1,6 +1,12 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
@@ -11,7 +17,8 @@ import {
   writeHeadersFile,
 } from "../scripts/csp-headers.mjs"
 
-const sha = (text) => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`
+const sha = (text) =>
+  `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`
 
 test("hashes executable inline scripts exactly as written", () => {
   const html = `<html><head><script>self.__next_f=[]</script>
@@ -19,7 +26,10 @@ test("hashes executable inline scripts exactly as written", () => {
 <script type="application/ld+json">{"@type":"Organization"}</script>
 <script type="module">import "/x.js"</script></head></html>`
   const sources = collectInlineSources(html)
-  assert.deepEqual(sources.scripts, [sha("self.__next_f=[]"), sha('import "/x.js"')])
+  assert.deepEqual(sources.scripts, [
+    sha("self.__next_f=[]"),
+    sha('import "/x.js"'),
+  ])
   assert.deepEqual(sources.styles, [])
   assert.equal(sources.styleAttributes, false)
 })
@@ -52,7 +62,12 @@ test("CSP allows only self plus the hashes, and never unsafe-inline scripts", ()
 })
 
 test("style attributes add only style-src-attr, never script relaxation", () => {
-  const csp = buildMarketingCsp({ scripts: [], styles: [], styleAttributes: true, https: false })
+  const csp = buildMarketingCsp({
+    scripts: [],
+    styles: [],
+    styleAttributes: true,
+    https: false,
+  })
   assert.match(csp, /style-src-attr 'unsafe-inline'/)
   assert.doesNotMatch(csp, /script-src[^;]*unsafe/)
   assert.doesNotMatch(csp, /upgrade-insecure-requests/)
@@ -63,13 +78,17 @@ test("writes one site-wide _headers rule from every exported page", () => {
   try {
     mkdirSync(join(dir, "legal"))
     writeFileSync(join(dir, "index.html"), "<script>one()</script>")
-    writeFileSync(join(dir, "legal", "terms.html"), "<script>two()</script><script>one()</script>")
+    writeFileSync(
+      join(dir, "legal", "terms.html"),
+      "<script>two()</script><script>one()</script>"
+    )
     writeFileSync(join(dir, "404.html"), "<style>p{}</style>")
     const result = writeHeadersFile(dir, { https: true })
     assert.equal(result.pages, 3)
     const headers = readFileSync(join(dir, "_headers"), "utf8")
     assert.match(headers, /^\/\*\n {2}Content-Security-Policy: /)
-    for (const hash of [sha("one()"), sha("two()")]) assert.ok(headers.includes(hash))
+    for (const hash of [sha("one()"), sha("two()")])
+      assert.ok(headers.includes(hash))
     assert.ok(headers.includes(sha("p{}")))
     // Each hash appears once even when several pages share a script.
     assert.equal(headers.split(sha("one()")).length - 1, 1)
@@ -81,7 +100,10 @@ test("writes one site-wide _headers rule from every exported page", () => {
 test("refuses to write headers when no pages were exported", () => {
   const dir = mkdtempSync(join(tmpdir(), "nthawi-csp-empty-"))
   try {
-    assert.throws(() => writeHeadersFile(dir, { https: true }), /MARKETING_EXPORT_EMPTY/)
+    assert.throws(
+      () => writeHeadersFile(dir, { https: true }),
+      /MARKETING_EXPORT_EMPTY/
+    )
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

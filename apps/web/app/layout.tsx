@@ -11,8 +11,16 @@ import { cn } from "@workspace/ui/lib/utils"
 import { ThemeProvider } from "@/components/theme-provider"
 import { copy } from "@/lib/copy"
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" })
-const lora = Lora({ subsets: ["latin"], variable: "--font-lora", display: "swap" })
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+})
+const lora = Lora({
+  subsets: ["latin"],
+  variable: "--font-lora",
+  display: "swap",
+})
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",

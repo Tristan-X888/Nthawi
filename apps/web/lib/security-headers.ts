@@ -17,8 +17,13 @@ export type OwnerCspOptions = {
  * attribute styles cannot execute script). Development adds 'unsafe-eval' for
  * React's error overlays only.
  */
-export function buildOwnerCsp({ nonce, development, https }: OwnerCspOptions): string {
-  if (!/^[A-Za-z0-9+/=_-]{16,}$/.test(nonce)) throw new Error("CSP_NONCE_INVALID")
+export function buildOwnerCsp({
+  nonce,
+  development,
+  https,
+}: OwnerCspOptions): string {
+  if (!/^[A-Za-z0-9+/=_-]{16,}$/.test(nonce))
+    throw new Error("CSP_NONCE_INVALID")
   const directives = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,
@@ -47,7 +52,8 @@ export function ownerHtmlHeaders(csp: string): Record<string, string> {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Cross-Origin-Opener-Policy": "same-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Permissions-Policy":
+      "camera=(), microphone=(), geolocation=(), payment=()",
     // Authenticated HTML must never be cached by a shared cache (NET-01).
     "Cache-Control": "private, no-store",
     // The owner application is never a search destination; marketing is.

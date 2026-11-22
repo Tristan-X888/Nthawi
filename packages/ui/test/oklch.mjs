@@ -32,15 +32,20 @@ function luminance(gamma) {
  */
 export function parseThemeBlocks(css) {
   const block = (selector) => {
-    const match = new RegExp(`(^|\\n)${selector}\\s*\\{([\\s\\S]*?)\\n\\}`).exec(
-      css
-    )
+    const match = new RegExp(
+      `(^|\\n)${selector}\\s*\\{([\\s\\S]*?)\\n\\}`
+    ).exec(css)
     if (!match) throw new Error(`Missing ${selector} block`)
     const tokens = {}
     const declaration =
       /--([a-z0-9-]+):\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\s*\)\s*;/g
     for (const [, name, l, c, h, alpha] of match[2].matchAll(declaration)) {
-      tokens[name] = [Number(l), Number(c), Number(h), alpha ? Number(alpha) : 1]
+      tokens[name] = [
+        Number(l),
+        Number(c),
+        Number(h),
+        alpha ? Number(alpha) : 1,
+      ]
     }
     return tokens
   }
@@ -55,7 +60,9 @@ function resolve(theme, name, backdrop = "background") {
   const colour = oklchToGammaSrgb([l, c, h])
   if (alpha === 1) return colour
   const base = resolve(theme, backdrop)
-  return colour.map((channel, index) => channel * alpha + base[index] * (1 - alpha))
+  return colour.map(
+    (channel, index) => channel * alpha + base[index] * (1 - alpha)
+  )
 }
 
 export function contrastRatio(theme, foreground, background) {

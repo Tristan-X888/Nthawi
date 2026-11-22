@@ -90,30 +90,34 @@ function AppShell({
               >
                 <Icon name="menu" />
               </SheetTrigger>
-              <SheetContent side="start" className="bg-sidebar text-sidebar-foreground">
-                  <div className="flex h-16 items-center justify-between px-4">
-                    <SheetTitle className="sr-only">Navigation</SheetTitle>
-                    <Logo />
-                    <SheetClose
-                      aria-label="Close navigation"
-                      className="grid size-10 place-items-center rounded-md hover:bg-sidebar-accent"
-                    >
-                      <Icon name="close" />
-                    </SheetClose>
-                  </div>
-                  <SidebarProvider currentPath={pathname} linkComponent={Link}>
-                    <nav
-                      aria-label="Main"
-                      className="flex-1 overflow-y-auto px-4 pb-6"
-                      onClick={(event) => {
-                        if ((event.target as HTMLElement).closest("a")) setDrawerOpen(false)
-                      }}
-                    >
-                      {sections.map((section) => (
-                        <SidebarSection key={section.id} section={section} />
-                      ))}
-                    </nav>
-                  </SidebarProvider>
+              <SheetContent
+                side="start"
+                className="bg-sidebar text-sidebar-foreground"
+              >
+                <div className="flex h-16 items-center justify-between px-4">
+                  <SheetTitle className="sr-only">Navigation</SheetTitle>
+                  <Logo />
+                  <SheetClose
+                    aria-label="Close navigation"
+                    className="grid size-10 place-items-center rounded-md hover:bg-sidebar-accent"
+                  >
+                    <Icon name="close" />
+                  </SheetClose>
+                </div>
+                <SidebarProvider currentPath={pathname} linkComponent={Link}>
+                  <nav
+                    aria-label="Main"
+                    className="flex-1 overflow-y-auto px-4 pb-6"
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("a"))
+                        setDrawerOpen(false)
+                    }}
+                  >
+                    {sections.map((section) => (
+                      <SidebarSection key={section.id} section={section} />
+                    ))}
+                  </nav>
+                </SidebarProvider>
               </SheetContent>
             </Sheet>
             <div className="min-w-0 flex-1">{breadcrumbs}</div>
@@ -129,7 +133,11 @@ function AppShell({
           </main>
         </div>
       </div>
-      <BottomNav items={mobilePrimary} currentPath={pathname} linkComponent={Link} />
+      <BottomNav
+        items={mobilePrimary}
+        currentPath={pathname}
+        linkComponent={Link}
+      />
     </SidebarProvider>
   )
 }
