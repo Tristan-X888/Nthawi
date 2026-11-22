@@ -1,0 +1,3 @@
+# Playwright output (traces, failure screenshots). Review screenshots go to
+# NTHAWI_SCREENSHOT_DIR outside the repository.
+.playwright/
