@@ -1,0 +1,69 @@
+/*
+ * Original "dark matter" hero field (no third-party asset): slow drifting teal
+ * nebulae over a dot grid on the 8 pt rhythm. Decorative layers sit behind
+ * content (z-index -1/-2) and stop moving under prefers-reduced-motion via the
+ * global rule in @workspace/ui/globals.css.
+ */
+.dark-matter {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.dark-matter::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  z-index: -2;
+  background:
+    radial-gradient(38% 34% at 74% 34%, color-mix(in oklch, var(--brand) 42%, transparent), transparent 72%),
+    radial-gradient(30% 28% at 88% 78%, oklch(0.42 0.08 210 / 0.38), transparent 70%),
+    radial-gradient(26% 24% at 18% 92%, color-mix(in oklch, var(--brand) 18%, transparent), transparent 70%);
+  filter: blur(28px);
+  animation: var(--animate-drift);
+}
+
+.dark-matter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(circle at 1px 1px, oklch(1 0 0 / 0.1) 1px, transparent 0);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 68% 40%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 65% at 68% 40%, #000 30%, transparent 100%);
+}
+
+/* The conversation figure enters once, in reading order (the one motion moment). */
+.reveal {
+  animation: reveal 480ms var(--ease-emphasized) both;
+}
+.reveal-2 {
+  animation-delay: 360ms;
+}
+.reveal-3 {
+  animation-delay: 900ms;
+}
+.reveal-4 {
+  animation-delay: 1350ms;
+}
+
+/* Reduced motion: show the finished conversation immediately, with no delay. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
